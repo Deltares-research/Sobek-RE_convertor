@@ -1,0 +1,5 @@
+xarray>=2024.1.0
+netCDF4>=1.6.5
+
+[dev]
+pytest>=8.2.0

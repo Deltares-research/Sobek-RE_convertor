@@ -1,3 +1,18 @@
+Metadata-Version: 2.4
+Name: sre-convertor
+Version: 0.1.0
+Summary: Convert Sobek-RE schematizations to Delft3D FM schematizations
+Author: Deltares
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: xarray>=2024.1.0
+Requires-Dist: netCDF4>=1.6.5
+Provides-Extra: dev
+Requires-Dist: pytest>=8.2.0; extra == "dev"
+Dynamic: license-file
+
 # Sobek-RE_convertor
 
 Tool for converting Sobek-RE models into Delft3D FM 1D models.
