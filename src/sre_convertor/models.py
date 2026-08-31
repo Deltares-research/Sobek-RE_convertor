@@ -95,6 +95,26 @@ class RuntimeSettings:
 
 
 @dataclass(frozen=True)
+class BranchRoughness:
+    branch_id: str
+    friction_type: str
+    value: float
+
+
+@dataclass(frozen=True)
+class BranchInitialCondition:
+    branch_id: str
+    chainage: float
+    water_level: float
+
+
+@dataclass(frozen=True)
+class MorphodynamicsSummary:
+    branch_count_with_grainsize: int
+    has_morphology_switch: bool
+
+
+@dataclass(frozen=True)
 class SreCaseModel:
     network: NetworkModel
     cross_section_definitions: tuple[CrossSectionDefinition, ...]
@@ -103,6 +123,9 @@ class SreCaseModel:
     laterals: tuple[LateralDischarge, ...]
     structures: tuple[Structure, ...]
     runtime: RuntimeSettings
+    roughness: tuple[BranchRoughness, ...]
+    initial_conditions: tuple[BranchInitialCondition, ...]
+    morphodynamics: MorphodynamicsSummary
 
 
 @dataclass(frozen=True)
@@ -111,6 +134,7 @@ class ConversionOptions:
     network_only: bool = False
     activate_cross_sections: bool = True
     test_duration_seconds: int = 7200
+    activate_morphodynamics: bool = False
 
 
 @dataclass

@@ -8,7 +8,7 @@ The first whole-tool implementation phase is available:
 
 
 - Scope: end-to-end case conversion pipeline with a stable runnable baseline.
-- Input: SRE case folder with records in `DEFTOP.*`, `DEFCRS.*`, `DEFCND.*`, `DEFSTR.*`, `DEFRUN.*`.
+- Input: SRE case folder with records in `DEFTOP.*`, `DEFGRD.*`, `DEFCRS.*`, `DEFCND.*`, `DEFSTR.*`, `DEFRUN.*`, `DEFFRC.*`, `DEFICN.*`, `DEFSUB.*`.
 - Grid: branch mesh density is taken from `DEFGRD.*` (`GRID` tables) when available.
 - Output: FM schematization in output directory with:
 	- `dimr_config.xml`
@@ -27,10 +27,33 @@ Additional files that are generated for inspection and optional activation:
 	- `dflowfm/CrossSectionDefinitions.ini` (active by default)
 	- `dflowfm/CrossSectionLocations.ini` (active by default)
 
-Still in progress:
+## Progress tracker
 
-- morphology/sediment and RTC coupling transfer
-- runtime validation target "simulation advances at least one timestep" for the bundled SRE example
+Done:
+
+- Topology conversion (`DEFTOP.*`) and branch discretization from `DEFGRD.*`.
+- Cross-section definitions/locations conversion (`DEFCRS.*`).
+- Boundary and lateral conversion (`DEFCND.*`) including runtime-safe series handling.
+- Structure conversion (`DEFSTR.*`) with STCM/DLST location linking.
+- Runtime parsing and short-run clamp (`DEFRUN.*`).
+- Roughness conversion first pass (`DEFFRC.*`): branch-level representative Chezy values are written to `roughness-Main.ini`.
+- Initial conditions first pass (`DEFICN.*`): FLIN branch water levels are parsed and used to derive initial water depth default.
+- Structure warning audit from FM `.dia` output.
+
+In progress:
+
+- Morphodynamics first pass:
+	- Source readiness detection is implemented (`DEFICN.*` MPIN + `DEFSUB.*` morphology switch).
+	- Optional MDU sediment block activation is available via `activate_morphodynamics=True`.
+	- Detailed sediment/morph files (`mor.mor`, `sed.sed`) are not generated yet.
+
+Not done yet:
+
+- Full morphodynamics/sediment parameter transfer from SRE to FM file set.
+- RTC coupling transfer and controller behavior parity.
+- Initial conditions beyond first-pass global depth proxy (for example detailed branch/profile fields where needed).
+- Roughness profile transfer at full spatial detail (currently reduced to representative branch value).
+- Stronger runtime acceptance criterion: "simulation advanced and produced expected history/map outputs", beyond initial output marker presence.
 
 ## Architecture
 
@@ -102,6 +125,19 @@ report = convert_case(
 		model_name="converted_case",
 		activate_cross_sections=False,
 )
+
+Enable first-pass morphodynamics block in MDU (experimental):
+
+```python
+from sre_convertor import convert_case
+
+report = convert_case(
+		input_dir="data/sre_simulation",
+		output_dir="build/fm_output",
+		model_name="converted_case",
+		activate_morphodynamics=True,
+)
+```
 ```
 
 Runtime success validation:

@@ -13,16 +13,19 @@ from .io.fm.cross_section_writer import (
 )
 from .io.fm.dimr_writer import write_dimr_config
 from .io.fm.initial_field_writer import (
-    write_default_initial_water_depth,
+    write_initial_water_depth,
     write_initial_fields_reference,
 )
 from .io.fm.mdu_writer import write_mdu
 from .io.fm.net_writer import write_network_netcdf
-from .io.fm.roughness_writer import write_default_roughness
+from .io.fm.roughness_writer import write_roughness
 from .io.fm.run_writer import write_run_dimr_bat
 from .io.fm.structure_writer import write_structures
 from .io.sre.condition_reader import read_conditions
 from .io.sre.cross_section_reader import read_cross_sections
+from .io.sre.friction_reader import read_friction
+from .io.sre.initial_conditions_reader import read_initial_conditions
+from .io.sre.morphodynamics_reader import read_morphodynamics_summary
 from .io.sre.network_reader import read_sre_network
 from .io.sre.runtime_reader import read_runtime_settings
 from .io.sre.structure_reader import read_structures
@@ -131,11 +134,14 @@ def convert_network_case(
         created_files.append(dflowfm_dir / structure_file_name)
 
     roughness_file_name = "roughness-Main.ini"
-    write_default_roughness(case_model.network, dflowfm_dir / roughness_file_name)
+    write_roughness(case_model.network, case_model.roughness, dflowfm_dir / roughness_file_name)
     created_files.append(dflowfm_dir / roughness_file_name)
 
     initial_water_depth_name = "InitialWaterDepth.ini"
-    write_default_initial_water_depth(dflowfm_dir / initial_water_depth_name)
+    write_initial_water_depth(
+        dflowfm_dir / initial_water_depth_name,
+        case_model.initial_conditions,
+    )
     created_files.append(dflowfm_dir / initial_water_depth_name)
 
     initial_fields_name = "initialFields.ini"
@@ -153,7 +159,7 @@ def convert_network_case(
         roughness_file_names=(roughness_file_name,),
         ini_field_file_name=initial_fields_name,
         runtime=case_model.runtime,
-        include_morphology=False,
+        include_morphology=options.activate_morphodynamics and case_model.morphodynamics.has_morphology_switch,
     )
     created_files.append(dflowfm_dir / mdu_filename)
 
@@ -234,6 +240,15 @@ def _read_sre_case(input_dir: Path, options: ConversionOptions) -> tuple[SreCase
     )
     warnings.extend(run_warnings)
 
+    roughness, roughness_warnings = read_friction(input_dir)
+    warnings.extend(roughness_warnings)
+
+    initial_conditions, initial_condition_warnings = read_initial_conditions(input_dir)
+    warnings.extend(initial_condition_warnings)
+
+    morphodynamics, morphodynamics_warnings = read_morphodynamics_summary(input_dir)
+    warnings.extend(morphodynamics_warnings)
+
     structures, structure_warnings = read_structures(input_dir)
     warnings.extend(structure_warnings)
 
@@ -246,6 +261,9 @@ def _read_sre_case(input_dir: Path, options: ConversionOptions) -> tuple[SreCase
             laterals=laterals,
             structures=structures,
             runtime=runtime,
+            roughness=roughness,
+            initial_conditions=initial_conditions,
+            morphodynamics=morphodynamics,
         ),
         warnings,
     )

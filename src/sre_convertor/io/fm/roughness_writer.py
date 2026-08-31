@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ...models import NetworkModel
+from ...models import BranchRoughness, NetworkModel
 
 
-def write_default_roughness(network: NetworkModel, target_path: Path) -> None:
+def write_roughness(
+    network: NetworkModel,
+    roughness_by_branch: tuple[BranchRoughness, ...],
+    target_path: Path,
+) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
+
+    source_roughness = {item.branch_id: item for item in roughness_by_branch}
 
     lines: list[str] = [
         "[General]",
@@ -21,15 +27,22 @@ def write_default_roughness(network: NetworkModel, target_path: Path) -> None:
     ]
 
     for branch in network.branches:
+        roughness = source_roughness.get(branch.id)
+        friction_type = "Manning"
+        friction_value = 0.03
+        if roughness is not None and roughness.friction_type.lower() == "chezy":
+            friction_type = "Chezy"
+            friction_value = roughness.value
+
         lines.extend(
             [
                 "[Branch]",
                 f"    branchId              = #{branch.id}#",
-                "    frictionType          = Manning",
+                f"    frictionType          = {friction_type}",
                 "    functionType          = constant",
                 "    numLocations          = 1",
                 "    chainage              = 0.000",
-                "    frictionValues        = 0.03000",
+                f"    frictionValues        = {friction_value:.5f}",
                 "",
             ]
         )

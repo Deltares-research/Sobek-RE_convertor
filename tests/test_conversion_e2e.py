@@ -73,6 +73,9 @@ def test_convert_case_activates_laterals_structures_and_initial_fields(tmp_path:
     assert "[lateral]" in ext
     assert (dflowfm_dir / "initialFields.ini").exists()
 
+    roughness = (dflowfm_dir / "roughness-Main.ini").read_text(encoding="utf-8")
+    assert "frictionType          = Chezy" in roughness
+
 
 def test_convert_case_can_disable_cross_sections(tmp_path: Path) -> None:
     input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
@@ -103,3 +106,19 @@ def test_convert_case_can_reduce_runtime_for_testing(tmp_path: Path) -> None:
 
     mdu = (output_dir / "dflowfm" / "demo_case_short.mdu").read_text(encoding="utf-8")
     assert "TStop                             = 3600" in mdu
+
+
+def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
+    input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
+    output_dir = tmp_path / "fm_case_mor"
+
+    convert_case(
+        input_dir,
+        output_dir,
+        model_name="demo_case_mor",
+        activate_morphodynamics=True,
+    )
+
+    mdu = (output_dir / "dflowfm" / "demo_case_mor.mdu").read_text(encoding="utf-8")
+    assert "[sediment]" in mdu
+    assert "MorFile                           = mor.mor" in mdu

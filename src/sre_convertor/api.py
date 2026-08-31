@@ -29,6 +29,7 @@ def convert_case(
     model_name: str = "sre2fm_case",
     activate_cross_sections: bool = True,
     test_duration_seconds: int = 7200,
+    activate_morphodynamics: bool = False,
 ) -> ConversionReport:
     """Convert an SRE case to a runnable FM schematization with supporting files."""
     options = ConversionOptions(
@@ -36,6 +37,7 @@ def convert_case(
         network_only=False,
         activate_cross_sections=activate_cross_sections,
         test_duration_seconds=test_duration_seconds,
+        activate_morphodynamics=activate_morphodynamics,
     )
     return convert_network_case(Path(input_dir), Path(output_dir), options)
 
