@@ -22,6 +22,7 @@ from .io.fm.morphodynamics_writer import write_morphodynamics_files
 from .io.fm.net_writer import write_network_netcdf
 from .io.fm.roughness_writer import write_roughness
 from .io.fm.run_writer import write_run_dimr_bat
+from .io.fm.rtc_writer import RtcCoupling, copy_rtc_package
 from .io.fm.structure_writer import write_structures
 from .io.sre.condition_reader import read_conditions
 from .io.sre.cross_section_reader import read_cross_sections
@@ -176,6 +177,17 @@ def convert_network_case(
                 "activate_morphodynamics=True requested, but no active morphology switch was found in DEFSUB.*."
             )
 
+    include_rtc = False
+    rtc_coupling: RtcCoupling | None = None
+    if options.activate_rtc:
+        rtc_source_dir = options.rtc_source_dir or input_dir / "rtc"
+        if rtc_source_dir.is_dir():
+            rtc_dir, rtc_coupling = copy_rtc_package(rtc_source_dir, output_dir / "rtc")
+            created_files.extend(path for path in rtc_dir.rglob("*") if path.is_file())
+            include_rtc = True
+        else:
+            warnings.append(f"activate_rtc=True requested, but no RTC package was found at {rtc_source_dir}.")
+
     write_mdu(
         dflowfm_dir / mdu_filename,
         model_name=options.model_name,
@@ -191,7 +203,14 @@ def convert_network_case(
     )
     created_files.append(dflowfm_dir / mdu_filename)
 
-    write_dimr_config(output_dir / "dimr_config.xml", mdu_filename, include_rtc=False)
+    write_dimr_config(
+        output_dir / "dimr_config.xml",
+        mdu_filename,
+        include_rtc=include_rtc,
+        rtc_coupling=rtc_coupling,
+        start_time=case_model.runtime.tstart_seconds,
+        stop_time=case_model.runtime.tstop_seconds,
+    )
     created_files.append(output_dir / "dimr_config.xml")
 
     created_files.append(write_run_dimr_bat(output_dir))

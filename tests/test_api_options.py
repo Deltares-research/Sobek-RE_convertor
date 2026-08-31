@@ -82,6 +82,22 @@ def test_convert_case_propagates_morphodynamics_flag(monkeypatch) -> None:
     assert options.activate_morphodynamics is True
 
 
+def test_convert_case_propagates_rtc_options(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_convert_network_case(input_dir: Path, output_dir: Path, options):
+        captured["options"] = options
+        return object()
+
+    monkeypatch.setattr(api, "convert_network_case", _fake_convert_network_case)
+
+    api.convert_case("in", "out", model_name="demo", activate_rtc=True, rtc_source_dir="rtc_src")
+
+    options = captured["options"]
+    assert options.activate_rtc is True
+    assert options.rtc_source_dir == Path("rtc_src")
+
+
 def test_audit_structure_parameter_warnings_delegates(monkeypatch) -> None:
     captured: dict[str, object] = {}
 

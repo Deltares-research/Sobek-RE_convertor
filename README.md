@@ -39,6 +39,7 @@ Done:
 - Roughness conversion first pass (`DEFFRC.*`): branch-level representative Chezy values are written to `roughness-Main.ini`.
 - Initial conditions first pass (`DEFICN.*`): FLIN branch water levels are parsed and used to derive initial water depth default.
 - Structure warning audit from FM `.dia` output.
+- RTC package pass-through: `activate_rtc=True` copies a supplied RTC package and wires DIMR couplers from `rtcDataConfig.xml` OpenMI exchange items.
 
 In progress:
 
@@ -59,7 +60,7 @@ In progress:
 Not done yet:
 
 - Full morphodynamics/sediment parameter transfer from SRE to FM file set.
-- RTC coupling transfer and controller behavior parity.
+- RTC controller conversion from native SRE definitions; current support assumes a ready RTC package is supplied.
 - Initial conditions beyond first-pass global depth proxy (for example detailed branch/profile fields where needed).
 - Roughness profile transfer at full spatial detail (currently reduced to representative branch value).
 - Stronger runtime acceptance criterion: "simulation advanced and produced expected history/map outputs", beyond initial output marker presence.

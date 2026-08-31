@@ -163,6 +163,8 @@ class ConversionOptions:
     activate_cross_sections: bool = True
     test_duration_seconds: int = 7200
     activate_morphodynamics: bool = False
+    activate_rtc: bool = False
+    rtc_source_dir: Path | None = None
 
 
 @dataclass

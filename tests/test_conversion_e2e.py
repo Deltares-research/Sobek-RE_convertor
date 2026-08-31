@@ -133,3 +133,38 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     assert "MxNULyr          = 19" in mor_text
     assert "ThUnLyr          = 5.0000000e-01" in mor_text
     assert (dflowfm_dir / "gsd_ini_str" / "lyr20_thk.xyz").exists()
+
+
+def test_convert_case_can_enable_rtc_with_supplied_package(tmp_path: Path) -> None:
+    input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
+    rtc_source_dir = Path(__file__).resolve().parents[1] / "data" / "fm" / "rtc"
+    output_dir = tmp_path / "fm_case_rtc"
+
+    report = convert_case(
+        input_dir,
+        output_dir,
+        model_name="demo_case_rtc",
+        activate_rtc=True,
+        rtc_source_dir=rtc_source_dir,
+    )
+
+    dimr_text = (output_dir / "dimr_config.xml").read_text(encoding="utf-8")
+    assert (output_dir / "rtc" / "rtcDataConfig.xml").exists()
+    assert any(path.name == "rtcToolsConfig.xml" for path in report.files_created)
+    assert "<component name=\"RTC\">" in dimr_text
+    assert "<coupler name=\"flowfm_to_rtc\">" in dimr_text
+    assert "<coupler name=\"rtc_to_flowfm\">" in dimr_text
+    assert "<time>0 600 7200</time>" in dimr_text
+    assert "<sourceName>observations/LMW.Drielboven/water_level</sourceName>" in dimr_text
+    assert "<targetName>weirs/ST_Driel_zom/CrestLevel</targetName>" in dimr_text
+
+
+def test_convert_case_warns_when_rtc_requested_without_package(tmp_path: Path) -> None:
+    input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
+    output_dir = tmp_path / "fm_case_missing_rtc"
+
+    report = convert_case(input_dir, output_dir, model_name="demo_case_no_rtc", activate_rtc=True)
+
+    dimr_text = (output_dir / "dimr_config.xml").read_text(encoding="utf-8")
+    assert any("activate_rtc=True requested" in warning for warning in report.warnings)
+    assert "<component name=\"RTC\">" not in dimr_text
