@@ -149,10 +149,19 @@ def convert_network_case(
     write_initial_fields_reference(dflowfm_dir / initial_fields_name, initial_water_depth_name)
     created_files.append(dflowfm_dir / initial_fields_name)
 
-    include_morphology = options.activate_morphodynamics and case_model.morphodynamics.has_morphology_switch
-    if include_morphology:
-        mor_file, sed_file, composition_file = write_morphodynamics_files(dflowfm_dir, case_model.morphodynamics)
-        created_files.extend([mor_file, sed_file, composition_file])
+    include_morphology = False
+    if options.activate_morphodynamics:
+        if case_model.morphodynamics.has_morphology_switch:
+            mor_file, sed_file, composition_file, bed_comp_file = write_morphodynamics_files(
+                dflowfm_dir,
+                case_model.morphodynamics,
+            )
+            created_files.extend([mor_file, sed_file, composition_file, bed_comp_file])
+            include_morphology = True
+        else:
+            warnings.append(
+                "activate_morphodynamics=True requested, but no active morphology switch was found in DEFSUB.*."
+            )
 
     write_mdu(
         dflowfm_dir / mdu_filename,

@@ -123,5 +123,8 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     mdu = (dflowfm_dir / "demo_case_mor.mdu").read_text(encoding="utf-8")
     assert "[sediment]" in mdu
     assert "MorFile                           = mor.mor" in mdu
+    assert "SedFile                           = sed.sed" in mdu
+    assert "BedlevType                        = 1" in mdu
     assert (dflowfm_dir / "mor.mor").exists()
     assert (dflowfm_dir / "sed.sed").exists()
+    assert (dflowfm_dir / "mor.composition.ini").exists()

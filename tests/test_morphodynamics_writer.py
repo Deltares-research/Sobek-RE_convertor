@@ -17,11 +17,12 @@ def test_write_morphodynamics_files_writes_mor_and_sed(tmp_path: Path) -> None:
         ),
     )
 
-    mor_path, sed_path, composition_path = write_morphodynamics_files(tmp_path, summary)
+    mor_path, sed_path, composition_path, bed_comp_path = write_morphodynamics_files(tmp_path, summary)
 
     assert mor_path.exists()
     assert sed_path.exists()
     assert composition_path.exists()
+    assert bed_comp_path.exists()
 
     mor_text = mor_path.read_text(encoding="utf-8")
     sed_text = sed_path.read_text(encoding="utf-8")
@@ -36,3 +37,7 @@ def test_write_morphodynamics_files_writes_mor_and_sed(tmp_path: Path) -> None:
     assert "[Fractions]" in composition_text
     assert "branchId = 7262" in composition_text
     assert "Fraction2 = 0.700000" in composition_text
+
+    bed_comp_text = bed_comp_path.read_text(encoding="utf-8")
+    assert "[BedCompositionFileInformation]" in bed_comp_text
+    assert "Type = volume fraction" in bed_comp_text

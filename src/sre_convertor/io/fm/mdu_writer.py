@@ -27,6 +27,7 @@ def write_mdu(
     cross_def = cross_def_file_name or ""
     structure_file = structure_file_name or ""
     ini_field = ini_field_file_name or ""
+    bedlev_type = 1 if include_morphology else 3
 
     sediment_block = ""
     if include_morphology:
@@ -54,7 +55,8 @@ frictFile                         = {frict}
 AllowBndAtBifurcation             = 1
 WaterLevIni                       = -999.0
 BedlevUni                         = -5.0
-BedlevType                        = 3
+BedlevType                        = {bedlev_type}
+Conveyance2D                      = -1                  # -1: R=HU,0: R=H, 1: R=A/P, 2: K=analytic-1D conv, 3: K=analytic-2D conv
 
 [numerics]
 CFLMax                            = 0.7

@@ -44,10 +44,12 @@ In progress:
 
 - Morphodynamics first pass:
 	- Source readiness detection is implemented (`DEFICN.*` MPIN + `DEFSUB.*` morphology switch).
-	- Optional MDU sediment block activation is available via `activate_morphodynamics=True`.
+	- `activate_morphodynamics=True` generates morphodynamics artifacts for inspection.
 	- Base `mor.mor` and `sed.sed` are generated from converted source summary values.
 	- `sed.sed` now contains multiple derived sediment fractions (D50 classes) from MPIN grain-size samples.
 	- Branch-aware composition export is generated in `mor.composition.ini` for traceability.
+	- `mor.ini` is generated with branch-level fraction weights for inspection and downstream coupling work.
+	- Compatibility guard: artifacts are generated, while direct MDU sediment coupling is deferred for current 1D runtime stability.
 	- Still simplified: advanced transport options and direct FM underlayer initialization wiring are pending.
 
 Not done yet:
