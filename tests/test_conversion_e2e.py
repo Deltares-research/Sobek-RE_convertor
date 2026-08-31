@@ -128,3 +128,8 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     assert (dflowfm_dir / "mor.mor").exists()
     assert (dflowfm_dir / "sed.sed").exists()
     assert (dflowfm_dir / "mor_composition.ini").exists()
+    mor_text = (dflowfm_dir / "mor.mor").read_text(encoding="utf-8")
+    assert "IUnderLyr        = 2" in mor_text
+    assert "MxNULyr          = 19" in mor_text
+    assert "ThUnLyr          = 5.0000000e-01" in mor_text
+    assert (dflowfm_dir / "gsd_ini_str" / "lyr20_thk.xyz").exists()

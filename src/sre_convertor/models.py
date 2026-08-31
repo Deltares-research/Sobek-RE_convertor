@@ -116,6 +116,16 @@ class MorphodynamicsSummary:
     sediment_fractions_d50_m: tuple[float, ...] = ()
     grain_size_sample_count: int = 0
     branch_composition: tuple[tuple[str, tuple[float, ...]], ...] = ()
+    underlayer_count: int | None = None
+    underlayer_thickness_m: float | None = None
+    layer_composition: tuple[LayerCompositionSample, ...] = ()
+
+
+@dataclass(frozen=True)
+class LayerCompositionSample:
+    branch_id: str
+    chainage: float
+    layer_weights: tuple[tuple[float, ...], ...]
 
 
 @dataclass(frozen=True)

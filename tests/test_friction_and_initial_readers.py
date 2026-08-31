@@ -40,9 +40,13 @@ def test_read_morphodynamics_summary_detects_source_signals() -> None:
     assert summary.representative_d50_m is not None
     assert summary.representative_d50_m > 0.0
     assert summary.grain_size_sample_count > 0
-    assert len(summary.sediment_fractions_d50_m) >= 3
+    assert len(summary.sediment_fractions_d50_m) == 5
     assert all(value > 0.0 for value in summary.sediment_fractions_d50_m)
     assert summary.branch_composition
+    assert summary.underlayer_count == 20
+    assert summary.underlayer_thickness_m == 0.5
+    assert len(summary.layer_composition) == 1084
+    assert len(summary.layer_composition[0].layer_weights) == 20
     first_branch, first_weights = summary.branch_composition[0]
     assert first_branch
     assert len(first_weights) == len(summary.sediment_fractions_d50_m)

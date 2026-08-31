@@ -47,10 +47,12 @@ In progress:
 	- `activate_morphodynamics=True` generates morphodynamics artifacts for inspection.
 	- Base `mor.mor` and `sed.sed` are generated from converted source summary values.
 	- `sed.sed` now contains multiple derived sediment fractions (D50 classes) from MPIN grain-size samples.
-	- Branch-aware composition export is generated in `mor.composition.ini` for traceability.
-	- `mor.ini` is generated with branch-level fraction weights for inspection and downstream coupling work.
-	- Compatibility guard: artifacts are generated, while direct MDU sediment coupling is deferred for current 1D runtime stability.
-	- Still simplified: advanced transport options and direct FM underlayer initialization wiring are pending.
+	- Spatial bed composition export is generated in `mor_composition.ini` with `gsd_ini_str/lyr01_*.xyz` layer files.
+	- `mor.mor` references `mor_composition.ini` through `[Underlayer] IniComp`.
+	- SRE `NUNLAY`/`DZUNLA` values are transferred to `mor.mor` and matching layer xyz files.
+	- SRE `$FRACT` and `$GSINIT` values from `GRAINP.TXT` drive sediment classes and per-layer spatial composition.
+	- MDU sediment coupling is enabled with `Sedimentmodelnr = 4`, `BedlevType = 1`, and `Conveyance2D = -1`.
+	- Still simplified: advanced transport options are pending.
 
 Not done yet:
 
