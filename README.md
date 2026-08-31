@@ -40,6 +40,7 @@ Done:
 - Initial conditions first pass (`DEFICN.*`): FLIN branch water levels are parsed and used to derive initial water depth default.
 - Structure warning audit from FM `.dia` output.
 - RTC package pass-through: `activate_rtc=True` copies a supplied RTC package and wires DIMR couplers from `rtcDataConfig.xml` OpenMI exchange items.
+- Native SRE RTC first pass: `DEFSTR.*` `CNTL`/`TRGR` records are parsed, inventoried in `rtc_sre_inventory.json`, and synthesized into a runnable D-RTC package for supported crest-level controllers.
 
 In progress:
 
@@ -60,7 +61,7 @@ In progress:
 Not done yet:
 
 - Full morphodynamics/sediment parameter transfer from SRE to FM file set.
-- RTC controller conversion from native SRE definitions; current support assumes a ready RTC package is supplied.
+- Full D-RTC controller parity for native SRE `CNTL`/`TRGR` definitions, including trigger combinations and gate-height controllers.
 - Initial conditions beyond first-pass global depth proxy (for example detailed branch/profile fields where needed).
 - Roughness profile transfer at full spatial detail (currently reduced to representative branch value).
 - Stronger runtime acceptance criterion: "simulation advanced and produced expected history/map outputs", beyond initial output marker presence.

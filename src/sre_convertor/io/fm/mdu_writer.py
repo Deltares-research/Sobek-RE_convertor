@@ -17,6 +17,7 @@ def write_mdu(
     roughness_file_names: tuple[str, ...],
     ini_field_file_name: str | None,
     runtime: RuntimeSettings,
+    observation_file_name: str | None = None,
     include_morphology: bool = False,
 ) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -27,6 +28,7 @@ def write_mdu(
     cross_def = cross_def_file_name or ""
     structure_file = structure_file_name or ""
     ini_field = ini_field_file_name or ""
+    obs_file = observation_file_name or ""
     bedlev_type = 1 if include_morphology else 3
 
     sediment_block = ""
@@ -81,6 +83,7 @@ ExtForceFileNew                   = {ext_file_name}
 
 [output]
 OutputDir                         =
+ObsFile                           = {obs_file}
 HisInterval                       = 3600.0 0.0 0.0
 MapInterval                       = 86400.0 0.0 0.0
 StatsInterval                     = -60.0

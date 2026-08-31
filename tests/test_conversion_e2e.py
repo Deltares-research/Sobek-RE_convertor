@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 import xarray as xr
 
@@ -166,5 +167,15 @@ def test_convert_case_warns_when_rtc_requested_without_package(tmp_path: Path) -
     report = convert_case(input_dir, output_dir, model_name="demo_case_no_rtc", activate_rtc=True)
 
     dimr_text = (output_dir / "dimr_config.xml").read_text(encoding="utf-8")
+    mdu_text = (output_dir / "dflowfm" / "demo_case_no_rtc.mdu").read_text(encoding="utf-8")
+    inventory_path = output_dir / "rtc_sre_inventory.json"
     assert any("activate_rtc=True requested" in warning for warning in report.warnings)
-    assert "<component name=\"RTC\">" not in dimr_text
+    assert any("Native SRE RTC CNTL/TRGR records" in warning for warning in report.warnings)
+    assert "<component name=\"RTC\">" in dimr_text
+    assert "ObsFile                           = ObservationPoints_rtc.ini" in mdu_text
+    assert (output_dir / "rtc" / "rtcToolsConfig.xml").exists()
+    assert (output_dir / "dflowfm" / "ObservationPoints_rtc.ini").exists()
+    assert inventory_path.exists()
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    assert len(inventory["controllers"]) == 8
+    assert len(inventory["triggers"]) == 6

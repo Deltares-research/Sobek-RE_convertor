@@ -22,7 +22,7 @@ from .io.fm.morphodynamics_writer import write_morphodynamics_files
 from .io.fm.net_writer import write_network_netcdf
 from .io.fm.roughness_writer import write_roughness
 from .io.fm.run_writer import write_run_dimr_bat
-from .io.fm.rtc_writer import RtcCoupling, copy_rtc_package
+from .io.fm.rtc_writer import RtcCoupling, copy_rtc_package, write_native_rtc_package, write_sre_rtc_inventory
 from .io.fm.structure_writer import write_structures
 from .io.sre.condition_reader import read_conditions
 from .io.sre.cross_section_reader import read_cross_sections
@@ -31,6 +31,7 @@ from .io.sre.initial_conditions_reader import read_initial_conditions
 from .io.sre.morphodynamics_reader import read_morphodynamics_summary
 from .io.sre.network_reader import read_sre_network
 from .io.sre.runtime_reader import read_runtime_settings
+from .io.sre.rtc_reader import read_sre_rtc
 from .io.sre.structure_reader import read_structures
 from .models import BoundaryCondition, ConversionOptions, ConversionReport, CrossSectionLocation, NetworkModel, SreCaseModel
 
@@ -179,6 +180,7 @@ def convert_network_case(
 
     include_rtc = False
     rtc_coupling: RtcCoupling | None = None
+    observation_file_name = None
     if options.activate_rtc:
         rtc_source_dir = options.rtc_source_dir or input_dir / "rtc"
         if rtc_source_dir.is_dir():
@@ -187,6 +189,24 @@ def convert_network_case(
             include_rtc = True
         else:
             warnings.append(f"activate_rtc=True requested, but no RTC package was found at {rtc_source_dir}.")
+            if case_model.rtc.controllers or case_model.rtc.triggers:
+                inventory_path = write_sre_rtc_inventory(output_dir / "rtc_sre_inventory.json", case_model.rtc)
+                created_files.append(inventory_path)
+                rtc_dir, rtc_coupling, observation_path, native_rtc_warnings = write_native_rtc_package(
+                    output_dir / "rtc",
+                    case_model.rtc,
+                    case_model.runtime,
+                )
+                created_files.extend(path for path in rtc_dir.rglob("*") if path.is_file())
+                if observation_path is not None:
+                    observation_file_name = observation_path.name
+                    created_files.append(observation_path)
+                warnings.extend(native_rtc_warnings)
+                warnings.append(
+                    "Native SRE RTC CNTL/TRGR records were synthesized into an RTC package; "
+                    "PID/trigger parity is approximate and should be reviewed against SOBEK behavior."
+                )
+                include_rtc = True
 
     write_mdu(
         dflowfm_dir / mdu_filename,
@@ -199,6 +219,7 @@ def convert_network_case(
         roughness_file_names=(roughness_file_name,),
         ini_field_file_name=initial_fields_name,
         runtime=case_model.runtime,
+        observation_file_name=observation_file_name,
         include_morphology=include_morphology,
     )
     created_files.append(dflowfm_dir / mdu_filename)
@@ -299,6 +320,9 @@ def _read_sre_case(input_dir: Path, options: ConversionOptions) -> tuple[SreCase
     structures, structure_warnings = read_structures(input_dir)
     warnings.extend(structure_warnings)
 
+    rtc, rtc_warnings = read_sre_rtc(input_dir)
+    warnings.extend(rtc_warnings)
+
     return (
         SreCaseModel(
             network=network,
@@ -311,6 +335,7 @@ def _read_sre_case(input_dir: Path, options: ConversionOptions) -> tuple[SreCase
             roughness=roughness,
             initial_conditions=initial_conditions,
             morphodynamics=morphodynamics,
+            rtc=rtc,
         ),
         warnings,
     )

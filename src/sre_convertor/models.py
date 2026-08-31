@@ -88,6 +88,36 @@ class Structure:
 
 
 @dataclass(frozen=True)
+class SreRtcController:
+    id: str
+    name: str
+    controller_type: str
+    controlled_parameter: str
+    controlled_structure_id: str | None
+    trigger_ids: tuple[str, ...]
+    observation_branch_id: str | None = None
+    observation_chainage: float | None = None
+    parameters: tuple[tuple[str, str], ...] = ()
+    tables: tuple[tuple[tuple[str, ...], ...], ...] = ()
+
+
+@dataclass(frozen=True)
+class SreRtcTrigger:
+    id: str
+    name: str
+    trigger_type: str
+    branch_id: str | None = None
+    chainage: float | None = None
+    tables: tuple[tuple[tuple[str, ...], ...], ...] = ()
+
+
+@dataclass(frozen=True)
+class SreRtcSummary:
+    controllers: tuple[SreRtcController, ...] = ()
+    triggers: tuple[SreRtcTrigger, ...] = ()
+
+
+@dataclass(frozen=True)
 class RuntimeSettings:
     refdate: datetime
     tstart_seconds: int
@@ -154,6 +184,7 @@ class SreCaseModel:
     roughness: tuple[BranchRoughness, ...]
     initial_conditions: tuple[BranchInitialCondition, ...]
     morphodynamics: MorphodynamicsSummary
+    rtc: SreRtcSummary = field(default_factory=SreRtcSummary)
 
 
 @dataclass(frozen=True)
