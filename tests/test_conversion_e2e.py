@@ -46,6 +46,8 @@ def test_convert_network_writes_minimum_fm_artifacts(tmp_path: Path) -> None:
         assert int(ds.sizes["network1d_nNodes"]) == 2
         assert int(ds.sizes["network1d_nEdges"]) == 1
         assert float(ds["network1d_edge_length"].values[0]) == 1000.0
+        assert "projected_coordinate_system" in ds.variables
+        assert "Deltares-0.10" in str(ds.attrs.get("Conventions", ""))
     finally:
         ds.close()
 
