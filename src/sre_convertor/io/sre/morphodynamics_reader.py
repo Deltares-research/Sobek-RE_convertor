@@ -1,13 +1,27 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import math
 from pathlib import Path
 import re
 import shlex
 import statistics
 
-from ...models import LayerCompositionSample, MorphodynamicsSummary
+from ...models import BranchTransportParameters, LayerCompositionSample, MorphodynamicsSummary
 from .records import load_records
+
+
+@dataclass(frozen=True)
+class _GrainpConfiguration:
+    fractions: tuple[float, ...]
+    layer_composition: tuple[LayerCompositionSample, ...]
+    underlayer_count: int | None
+    underlayer_thickness_m: float | None
+    sediment_parameters: tuple[tuple[str, str], ...]
+    morphology_parameters: tuple[tuple[str, str], ...]
+    graded_sediment_options: tuple[tuple[str, str], ...]
+    graded_sediment_parameters: tuple[tuple[str, str], ...]
+    graded_sediment_flags: tuple[str, ...]
 
 
 def read_morphodynamics_summary(input_dir: Path) -> tuple[MorphodynamicsSummary, list[str]]:
@@ -15,6 +29,7 @@ def read_morphodynamics_summary(input_dir: Path) -> tuple[MorphodynamicsSummary,
 
     mpin_records = load_records(input_dir, "DEFICN", {"MPIN"})
     sbst_records = load_records(input_dir, "DEFSUB", {"SBST"})
+    trns_records = load_records(input_dir, "DEFTRN", {"TRNS"})
 
     branch_ids = {
         record.attrs.get("ci", "")
@@ -24,12 +39,13 @@ def read_morphodynamics_summary(input_dir: Path) -> tuple[MorphodynamicsSummary,
     has_morphology_switch = any(record.attrs.get("md") == "1" for record in sbst_records)
     grain_size_samples = _extract_grain_size_samples(mpin_records)
     representative_d50_m = statistics.median(grain_size_samples) if grain_size_samples else None
-    grainp_fractions, layer_composition, underlayer_count, underlayer_thickness_m = _read_grainp_configuration(input_dir)
-    sediment_fractions = grainp_fractions or _derive_sediment_fractions(grain_size_samples)
+    grainp_config = _read_grainp_configuration(input_dir)
+    sediment_fractions = grainp_config.fractions or _derive_sediment_fractions(grain_size_samples)
     branch_samples = _extract_branch_grain_size_samples(mpin_records)
-    branch_composition = _compute_layer_branch_composition(layer_composition, underlayer_count) or _compute_branch_composition(
-        branch_samples, sediment_fractions
-    )
+    branch_composition = _compute_layer_branch_composition(
+        grainp_config.layer_composition,
+        grainp_config.underlayer_count,
+    ) or _compute_branch_composition(branch_samples, sediment_fractions)
 
     if branch_ids and not has_morphology_switch:
         warnings.append("MPIN grain-size initialization found, but DEFSUB does not indicate active morphology switch.")
@@ -40,20 +56,50 @@ def read_morphodynamics_summary(input_dir: Path) -> tuple[MorphodynamicsSummary,
         representative_d50_m=representative_d50_m,
         sediment_fractions_d50_m=sediment_fractions,
         grain_size_sample_count=len(grain_size_samples),
+        sediment_parameters=grainp_config.sediment_parameters,
+        morphology_parameters=grainp_config.morphology_parameters,
+        graded_sediment_options=grainp_config.graded_sediment_options,
+        graded_sediment_parameters=grainp_config.graded_sediment_parameters,
+        graded_sediment_flags=grainp_config.graded_sediment_flags,
+        transport_parameters=_read_transport_parameters(trns_records),
         branch_composition=branch_composition,
-        underlayer_count=underlayer_count,
-        underlayer_thickness_m=underlayer_thickness_m,
-        layer_composition=layer_composition,
+        underlayer_count=grainp_config.underlayer_count,
+        underlayer_thickness_m=grainp_config.underlayer_thickness_m,
+        layer_composition=grainp_config.layer_composition,
     )
     return summary, warnings
 
 
-def _read_grainp_configuration(
-    input_dir: Path,
-) -> tuple[tuple[float, ...], tuple[LayerCompositionSample, ...], int | None, float | None]:
+def _read_transport_parameters(records: list) -> tuple[BranchTransportParameters, ...]:
+    parameters: list[BranchTransportParameters] = []
+    for record in records:
+        branch_id = record.attrs.get("ci")
+        if not branch_id or branch_id == "-1":
+            continue
+
+        coefficients: list[tuple[str, float]] = []
+        for key in ("au", "bu", "gu", "tc", "rf", "va", "e1", "e2", "e3", "e4", "e5", "e6", "e7"):
+            value = _to_float(record.attrs.get(key, ""))
+            if value is None or value >= 1.0e8:
+                continue
+            coefficients.append((key.upper(), value))
+
+        parameters.append(
+            BranchTransportParameters(
+                branch_id=branch_id,
+                formula_type=_to_int(record.attrs.get("ty", "")),
+                calibration_factor=_to_float(record.attrs.get("mu", "")),
+                coefficients=tuple(coefficients),
+            )
+        )
+
+    return tuple(parameters)
+
+
+def _read_grainp_configuration(input_dir: Path) -> _GrainpConfiguration:
     path = input_dir / "GRAINP.TXT"
     if not path.exists():
-        return tuple(), tuple(), None, None
+        return _GrainpConfiguration(tuple(), tuple(), None, None, tuple(), tuple(), tuple(), tuple(), tuple())
 
     branch_number_map = _read_branch_number_map(input_dir)
     lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
@@ -61,6 +107,12 @@ def _read_grainp_configuration(
     samples: list[LayerCompositionSample] = []
     underlayer_count: int | None = None
     underlayer_thickness_m: float | None = None
+    sediment_parameters: dict[str, str] = {}
+    morphology_parameters: dict[str, str] = {}
+    graded_sediment_options: dict[str, str] = {}
+    graded_sediment_parameters: dict[str, str] = {}
+    graded_sediment_flags: set[str] = set()
+    current_section: str | None = None
     current_branch_id: str | None = None
     current_chainage: float | None = None
     current_layers: dict[int, tuple[float, ...]] = {}
@@ -86,20 +138,47 @@ def _read_grainp_configuration(
             continue
 
         tokens = shlex.split(line)
+        if tokens and tokens[0].startswith("$"):
+            keyword = tokens[0].upper()
+            current_section = keyword if keyword in {"$SEDPAR", "$MORPAR", "$GSOPT", "$GSPAR"} else None
+
         if tokens and tokens[0].upper() == "$FRACT":
             bounds = _to_float_tuple(tokens[1:])
             if len(bounds) >= 2:
                 fractions = tuple(math.sqrt(bounds[idx] * bounds[idx + 1]) for idx in range(len(bounds) - 1))
             continue
 
+        if current_section in {"$SEDPAR", "$MORPAR", "$GSOPT", "$GSPAR"}:
+            payload = line.removeprefix(current_section).strip()
+            if payload:
+                _read_parameter_payload(
+                    payload,
+                    sediment_parameters,
+                    morphology_parameters,
+                    graded_sediment_options,
+                    graded_sediment_parameters,
+                    graded_sediment_flags,
+                    current_section,
+                )
+                if line.upper().startswith("$GSOPT"):
+                    continue
+
         count_match = re.match(r"^NUNLAY\s*=\s*(\d+)\b", line, flags=re.IGNORECASE)
         if count_match:
             underlayer_count = int(count_match.group(1))
+            if current_section == "$GSOPT":
+                graded_sediment_options["NUNLAY"] = count_match.group(1)
             continue
 
         thickness_match = re.match(r"^DZUNLA\s*=\s*([-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?)\b", line, flags=re.IGNORECASE)
         if thickness_match:
             underlayer_thickness_m = float(thickness_match.group(1))
+            if current_section == "$GSPAR":
+                graded_sediment_parameters["DZUNLA"] = thickness_match.group(1)
+            continue
+
+        if current_section == "$GSOPT" and re.match(r"^[A-Z][A-Z0-9_]*$", line, flags=re.IGNORECASE):
+            graded_sediment_flags.add(line.upper())
             continue
 
         gsinit_match = re.match(
@@ -123,7 +202,43 @@ def _read_grainp_configuration(
                 current_layers[layer_idx] = weights
 
     flush_current_sample()
-    return fractions, tuple(samples), underlayer_count, underlayer_thickness_m
+    return _GrainpConfiguration(
+        fractions=fractions,
+        layer_composition=tuple(samples),
+        underlayer_count=underlayer_count,
+        underlayer_thickness_m=underlayer_thickness_m,
+        sediment_parameters=tuple(sorted(sediment_parameters.items())),
+        morphology_parameters=tuple(sorted(morphology_parameters.items())),
+        graded_sediment_options=tuple(sorted(graded_sediment_options.items())),
+        graded_sediment_parameters=tuple(sorted(graded_sediment_parameters.items())),
+        graded_sediment_flags=tuple(sorted(graded_sediment_flags)),
+    )
+
+
+def _read_parameter_payload(
+    payload: str,
+    sediment_parameters: dict[str, str],
+    morphology_parameters: dict[str, str],
+    graded_sediment_options: dict[str, str],
+    graded_sediment_parameters: dict[str, str],
+    graded_sediment_flags: set[str],
+    section: str,
+) -> None:
+    target = {
+        "$SEDPAR": sediment_parameters,
+        "$MORPAR": morphology_parameters,
+        "$GSOPT": graded_sediment_options,
+        "$GSPAR": graded_sediment_parameters,
+    }[section]
+    for key, value in re.findall(r"\b([A-Z][A-Z0-9_]*)\s*=\s*([^\s!]+)", payload, flags=re.IGNORECASE):
+        target[key.upper()] = value
+
+    if section != "$GSOPT" or "=" in payload:
+        return
+
+    for token in shlex.split(payload):
+        if re.match(r"^[A-Z][A-Z0-9_]*$", token, flags=re.IGNORECASE):
+            graded_sediment_flags.add(token.upper())
 
 
 def _read_branch_number_map(input_dir: Path) -> dict[int, str]:
@@ -156,6 +271,20 @@ def _to_float_tuple(tokens: list[str]) -> tuple[float, ...]:
         except ValueError:
             continue
     return tuple(values)
+
+
+def _to_float(raw: str) -> float | None:
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_int(raw: str) -> int | None:
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 def _compute_layer_branch_composition(

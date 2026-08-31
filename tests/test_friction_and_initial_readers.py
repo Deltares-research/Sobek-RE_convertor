@@ -45,6 +45,29 @@ def test_read_morphodynamics_summary_detects_source_signals() -> None:
     assert summary.branch_composition
     assert summary.underlayer_count == 20
     assert summary.underlayer_thickness_m == 0.5
+    assert dict(summary.sediment_parameters) == {
+        "ALLUVIAL": "0.2",
+        "KINVIS": "0.000001",
+        "PACFAC": "0.30",
+        "RELDEN": "1.65",
+    }
+    assert dict(summary.morphology_parameters)["METHOD"] == "PROPORTIONAL"
+    assert dict(summary.graded_sediment_options) == {
+        "HEIOPT": "GILL",
+        "LATHIC": "INITIAL",
+        "LAYERS": "1",
+        "LENOPT": "YALIN",
+        "NUNLAY": "20",
+        "ROUOPT": "WHITE",
+    }
+    assert dict(summary.graded_sediment_parameters)["ZBEPS"] == "0.05"
+    assert summary.graded_sediment_flags == ("NONNGP",)
+    assert len(summary.transport_parameters) == 7
+    first_transport = summary.transport_parameters[0]
+    assert first_transport.branch_id == "453"
+    assert first_transport.formula_type == 1
+    assert first_transport.calibration_factor == 0.7
+    assert ("E1", 0.4) in first_transport.coefficients
     assert len(summary.layer_composition) == 1084
     assert len(summary.layer_composition[0].layer_weights) == 20
     first_branch, first_weights = summary.branch_composition[0]

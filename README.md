@@ -51,6 +51,8 @@ In progress:
 	- `mor.mor` references `mor_composition.ini` through `[Underlayer] IniComp`.
 	- SRE `NUNLAY`/`DZUNLA` values are transferred to `mor.mor` and matching layer xyz files.
 	- SRE `$FRACT` and `$GSINIT` values from `GRAINP.TXT` drive sediment classes and per-layer spatial composition.
+	- SRE `$SEDPAR`/`$MORPAR`/`$GSOPT`/`$GSPAR` blocks are parsed for traceability; `RELDEN`/`PACFAC` drive sediment densities.
+	- SRE `DEFTRN.*` branch `mu` calibration values are exported as spatial `acal_*.xyz` files and referenced from `sed.sed`.
 	- MDU sediment coupling is enabled with `Sedimentmodelnr = 4`, `BedlevType = 1`, and `Conveyance2D = -1`.
 	- Still simplified: advanced transport options are pending.
 

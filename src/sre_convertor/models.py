@@ -109,12 +109,26 @@ class BranchInitialCondition:
 
 
 @dataclass(frozen=True)
+class BranchTransportParameters:
+    branch_id: str
+    formula_type: int | None = None
+    calibration_factor: float | None = None
+    coefficients: tuple[tuple[str, float], ...] = ()
+
+
+@dataclass(frozen=True)
 class MorphodynamicsSummary:
     branch_count_with_grainsize: int
     has_morphology_switch: bool
     representative_d50_m: float | None = None
     sediment_fractions_d50_m: tuple[float, ...] = ()
     grain_size_sample_count: int = 0
+    sediment_parameters: tuple[tuple[str, str], ...] = ()
+    morphology_parameters: tuple[tuple[str, str], ...] = ()
+    graded_sediment_options: tuple[tuple[str, str], ...] = ()
+    graded_sediment_parameters: tuple[tuple[str, str], ...] = ()
+    graded_sediment_flags: tuple[str, ...] = ()
+    transport_parameters: tuple[BranchTransportParameters, ...] = ()
     branch_composition: tuple[tuple[str, tuple[float, ...]], ...] = ()
     underlayer_count: int | None = None
     underlayer_thickness_m: float | None = None
