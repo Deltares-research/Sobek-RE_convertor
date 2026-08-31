@@ -4,6 +4,7 @@ import shlex
 from pathlib import Path
 
 from ...models import Branch, NetworkModel, Node
+from .records import load_records
 
 class SreParseError(ValueError):
     pass
@@ -94,4 +95,49 @@ def read_sre_network(input_dir: Path) -> NetworkModel:
     if not branches:
         raise SreParseError(f"No BRCH records found in {source_file.name}.")
 
+    branch_grid_chainages = _read_branch_grid_chainages(input_dir)
+    branches = [
+        Branch(
+            id=branch.id,
+            name=branch.name,
+            from_node_id=branch.from_node_id,
+            to_node_id=branch.to_node_id,
+            length=branch.length,
+            grid_chainages=branch_grid_chainages.get(branch.id, tuple()),
+        )
+        for branch in branches
+    ]
+
     return NetworkModel(nodes=tuple(nodes), branches=tuple(branches), source_file=source_file)
+
+
+def _read_branch_grid_chainages(input_dir: Path) -> dict[str, tuple[float, ...]]:
+    records = load_records(input_dir, "DEFGRD", {"GRID"})
+    chainages_by_branch: dict[str, tuple[float, ...]] = {}
+
+    for record in records:
+        branch_id = record.attrs.get("ci")
+        if not branch_id:
+            continue
+
+        values: list[float] = []
+        if record.tables:
+            for row in record.tables[0]:
+                if not row:
+                    continue
+                try:
+                    values.append(float(row[0]))
+                except ValueError:
+                    continue
+
+        if values:
+            chainages_by_branch[branch_id] = _normalize_chainages(values)
+
+    return chainages_by_branch
+
+
+def _normalize_chainages(values: list[float]) -> tuple[float, ...]:
+    uniq_sorted = sorted(set(v for v in values if v >= 0.0))
+    if not uniq_sorted:
+        return tuple()
+    return tuple(uniq_sorted)

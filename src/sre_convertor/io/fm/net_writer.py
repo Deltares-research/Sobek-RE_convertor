@@ -24,9 +24,11 @@ def write_network_netcdf(network: NetworkModel, target_path: Path) -> None:
             [[start.x, start.y], [end.x, end.y]],
             dtype=np.float64,
         )
+
+        offsets = _branch_offsets(branch.grid_chainages, branch.length)
         hydro_branch = HydroBranch(
             geometry=geometry,
-            branch_offsets=np.array([0.0, branch.length], dtype=np.float64),
+            branch_offsets=offsets,
         )
         hydro_network.mesh1d_add_branch(
             hydro_branch,
@@ -36,3 +38,15 @@ def write_network_netcdf(network: NetworkModel, target_path: Path) -> None:
         )
 
     hydro_network.to_file(target_path)
+
+
+def _branch_offsets(chainages: tuple[float, ...], branch_length: float) -> np.ndarray:
+    if chainages:
+        offsets = [value for value in chainages if 0.0 <= value <= branch_length]
+        if not offsets or offsets[0] != 0.0:
+            offsets.insert(0, 0.0)
+        if offsets[-1] != branch_length:
+            offsets.append(branch_length)
+        return np.array(sorted(set(offsets)), dtype=np.float64)
+
+    return np.array([0.0, branch_length], dtype=np.float64)
