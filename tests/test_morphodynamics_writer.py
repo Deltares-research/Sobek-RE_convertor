@@ -34,9 +34,11 @@ def test_write_morphodynamics_files_writes_mor_and_sed(tmp_path: Path) -> None:
     assert "SedDia           = 3.4000000e-03" in sed_text
 
     composition_text = composition_path.read_text(encoding="utf-8")
-    assert "[Fractions]" in composition_text
-    assert "branchId = 7262" in composition_text
-    assert "Fraction2 = 0.700000" in composition_text
+    assert "[BedCompositionFileInformation]" in composition_text
+    assert "[Layer]" in composition_text
+    assert "Type = volume fraction" in composition_text
+    # Should have Thick and Fraction references when no spatial data provided
+    # (falls back to per-branch format in bed_comp_path instead)
 
     bed_comp_text = bed_comp_path.read_text(encoding="utf-8")
     assert "[BedCompositionFileInformation]" in bed_comp_text

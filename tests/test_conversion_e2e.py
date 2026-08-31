@@ -127,4 +127,4 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     assert "BedlevType                        = 1" in mdu
     assert (dflowfm_dir / "mor.mor").exists()
     assert (dflowfm_dir / "sed.sed").exists()
-    assert (dflowfm_dir / "mor.composition.ini").exists()
+    assert (dflowfm_dir / "mor_composition.ini").exists()

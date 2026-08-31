@@ -11,6 +11,7 @@ from .io.fm.cross_section_writer import (
     write_cross_section_definitions,
     write_cross_section_locations,
 )
+from .io.fm.cross_section_interpolator import densify_cross_sections_for_grid
 from .io.fm.dimr_writer import write_dimr_config
 from .io.fm.initial_field_writer import (
     write_initial_water_depth,
@@ -30,7 +31,7 @@ from .io.sre.morphodynamics_reader import read_morphodynamics_summary
 from .io.sre.network_reader import read_sre_network
 from .io.sre.runtime_reader import read_runtime_settings
 from .io.sre.structure_reader import read_structures
-from .models import BoundaryCondition, ConversionOptions, ConversionReport, NetworkModel, SreCaseModel
+from .models import BoundaryCondition, ConversionOptions, ConversionReport, CrossSectionLocation, NetworkModel, SreCaseModel
 
 
 def _validate_network(network: NetworkModel) -> list[str]:
@@ -89,15 +90,25 @@ def convert_network_case(
 
     cross_def_name = None
     cross_loc_name = None
+    cross_locs_fm: tuple[CrossSectionLocation, ...] | None = None
     if case_model.cross_section_definitions and case_model.cross_section_locations:
+        # For morphodynamics, create unique definitions per location to avoid FM errors.
+        create_unique = options.activate_morphodynamics
+        cross_defs_fm, cross_locs_fm, cross_interp_warnings = densify_cross_sections_for_grid(
+            case_model.network,
+            case_model.cross_section_definitions,
+            case_model.cross_section_locations,
+            create_unique_definitions=create_unique,
+        )
+        warnings.extend(cross_interp_warnings)
         cross_def_name = "CrossSectionDefinitions.ini"
         cross_loc_name = "CrossSectionLocations.ini"
         write_cross_section_definitions(
-            case_model.cross_section_definitions,
+            cross_defs_fm,
             dflowfm_dir / cross_def_name,
         )
         write_cross_section_locations(
-            case_model.cross_section_locations,
+            cross_locs_fm,
             dflowfm_dir / cross_loc_name,
         )
         created_files.extend([dflowfm_dir / cross_def_name, dflowfm_dir / cross_loc_name])
@@ -155,6 +166,8 @@ def convert_network_case(
             mor_file, sed_file, composition_file, bed_comp_file = write_morphodynamics_files(
                 dflowfm_dir,
                 case_model.morphodynamics,
+                network=case_model.network,
+                cross_section_locations=cross_locs_fm,
             )
             created_files.extend([mor_file, sed_file, composition_file, bed_comp_file])
             include_morphology = True
