@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shlex
 
 from ...models import Structure
 from .records import RawRecord, load_records
@@ -12,17 +13,22 @@ def read_structures(input_dir: Path) -> tuple[tuple[Structure, ...], list[str]]:
     records = load_records(input_dir, "DEFSTR", {"STRU", "STCM", "STDS"})
 
     location_by_id: dict[str, RawRecord] = {}
-    compound_locations: list[RawRecord] = []
+    compound_location_by_id: dict[str, RawRecord] = {}
+    structure_to_compound_id = _read_structure_to_compound_links(input_dir)
     definition_link_by_id: dict[str, str] = {}
     definition_by_id: dict[str, RawRecord] = {}
 
     for record in records:
-        if record.key == "STRU" and "dd" not in record.attrs:
+        if record.key == "STRU" and "dd" not in record.attrs and "ci" in record.attrs and "lc" in record.attrs:
             structure_id = record.attrs.get("id")
             if structure_id:
                 location_by_id[structure_id] = record
         elif record.key == "STCM":
-            compound_locations.append(record)
+            compound_id = record.attrs.get("id")
+            if not compound_id:
+                continue
+            if "ci" in record.attrs and "lc" in record.attrs:
+                compound_location_by_id[compound_id] = record
         elif record.key == "STRU" and "dd" in record.attrs:
             structure_id = record.attrs.get("id")
             if structure_id:
@@ -48,7 +54,12 @@ def read_structures(input_dir: Path) -> tuple[tuple[Structure, ...], list[str]]:
         chainage = _as_float(location_record.attrs.get("lc"), 0.0)
 
         if branch_id == "-1":
-            mapped = _match_compound_location(location_record, compound_locations)
+            mapped = _match_compound_location(
+                structure_id,
+                location_record,
+                structure_to_compound_id,
+                compound_location_by_id,
+            )
             if mapped is None:
                 warnings.append(
                     f"Structure {structure_id} has no direct branch location and could not be matched to STCM location."
@@ -84,11 +95,23 @@ def read_structures(input_dir: Path) -> tuple[tuple[Structure, ...], list[str]]:
 
 
 def _match_compound_location(
+    structure_id: str,
     location_record: RawRecord,
-    compound_locations: list[RawRecord],
+    structure_to_compound_id: dict[str, str],
+    compound_location_by_id: dict[str, RawRecord],
 ) -> tuple[str, float] | None:
+    compound_id = structure_to_compound_id.get(structure_id)
+    if compound_id:
+        compound_record = compound_location_by_id.get(compound_id)
+        if compound_record is not None:
+            branch_id = compound_record.attrs.get("ci")
+            chainage = _as_float(compound_record.attrs.get("lc"), None)
+            if branch_id and chainage is not None:
+                return branch_id, chainage
+
+    # Fallback heuristic if explicit compound membership was unavailable.
     location_name = location_record.attrs.get("nm", "").lower()
-    for candidate in compound_locations:
+    for candidate in compound_location_by_id.values():
         candidate_name = candidate.attrs.get("nm", "").lower()
         if not candidate_name:
             continue
@@ -122,3 +145,47 @@ def _as_float(value: str | None, default: float | None) -> float | None:
         return float(value)
     except ValueError:
         return default
+
+
+def _read_structure_to_compound_links(input_dir: Path) -> dict[str, str]:
+    links: dict[str, str] = {}
+
+    for path in sorted(input_dir.glob("DEFSTR.*")):
+        if not path.is_file():
+            continue
+
+        current_compound_id: str | None = None
+        in_dlst = False
+
+        for raw_line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            tokens = shlex.split(line)
+            if not tokens:
+                continue
+
+            key = tokens[0].upper()
+            if key == "STCM":
+                current_compound_id = None
+                for idx in range(1, len(tokens) - 1):
+                    if tokens[idx].lower() == "id":
+                        current_compound_id = tokens[idx + 1].strip("'")
+                        break
+                in_dlst = False
+                continue
+
+            if key == "DLST":
+                in_dlst = not in_dlst
+                continue
+
+            if not in_dlst or not current_compound_id:
+                continue
+
+            for token in tokens:
+                member_id = token.strip("'")
+                if member_id and member_id != "-1":
+                    links[member_id] = current_compound_id
+
+    return links

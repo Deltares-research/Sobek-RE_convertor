@@ -65,3 +65,25 @@ def test_convert_case_propagates_test_duration(monkeypatch) -> None:
 
     options = captured["options"]
     assert options.test_duration_seconds == 900
+
+
+def test_audit_structure_parameter_warnings_delegates(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _Sentinel:
+        pass
+
+    sentinel = _Sentinel()
+
+    def _fake_audit(output_dir: Path, model_name: str | None = None):
+        captured["output_dir"] = output_dir
+        captured["model_name"] = model_name
+        return sentinel
+
+    monkeypatch.setattr(api, "audit_structure_warnings", _fake_audit)
+
+    result = api.audit_structure_parameter_warnings("out", model_name="demo")
+
+    assert result is sentinel
+    assert captured["output_dir"] == Path("out")
+    assert captured["model_name"] == "demo"

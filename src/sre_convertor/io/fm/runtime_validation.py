@@ -24,7 +24,7 @@ def validate_dia_success(output_dir: Path, model_name: str | None = None) -> Run
             dia_file=None,
         )
 
-    dia_file = _select_dia_file(dflowfm_dir, model_name=model_name)
+    dia_file = select_dia_file(dflowfm_dir, model_name=model_name)
     if dia_file is None:
         return RuntimeValidationResult(
             success=False,
@@ -63,7 +63,7 @@ def run_and_validate_output(
             dia_file=None,
         )
 
-    previous_dia = _select_dia_file(output_dir / "dflowfm", model_name=model_name)
+    previous_dia = select_dia_file(output_dir / "dflowfm", model_name=model_name)
     previous_mtime_ns = previous_dia.stat().st_mtime_ns if previous_dia and previous_dia.exists() else None
 
     try:
@@ -110,7 +110,7 @@ def run_and_validate_output(
     return result
 
 
-def _select_dia_file(dflowfm_dir: Path, model_name: str | None) -> Path | None:
+def select_dia_file(dflowfm_dir: Path, model_name: str | None) -> Path | None:
     dia_files = sorted(dflowfm_dir.glob("*.dia"))
     if not dia_files:
         dia_files = sorted(dflowfm_dir.glob("**/*.dia"))

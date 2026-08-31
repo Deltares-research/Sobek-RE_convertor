@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .io.fm.structure_warning_audit import StructureWarningAuditResult, audit_structure_warnings
 from .io.fm.runtime_validation import RuntimeValidationResult, run_and_validate_output, validate_dia_success
 from .models import ConversionOptions, ConversionReport
 from .orchestrator import convert_network_case
@@ -58,3 +59,11 @@ def run_and_validate_conversion(
         model_name=model_name,
         timeout_seconds=timeout_seconds,
     )
+
+
+def audit_structure_parameter_warnings(
+    output_dir: str | Path,
+    model_name: str | None = None,
+) -> StructureWarningAuditResult:
+    """Summarize FM structure parameter auto-adjustment warnings from the latest .dia file."""
+    return audit_structure_warnings(Path(output_dir), model_name=model_name)
