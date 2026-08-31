@@ -17,6 +17,7 @@ from .io.fm.initial_field_writer import (
     write_initial_fields_reference,
 )
 from .io.fm.mdu_writer import write_mdu
+from .io.fm.morphodynamics_writer import write_morphodynamics_files
 from .io.fm.net_writer import write_network_netcdf
 from .io.fm.roughness_writer import write_roughness
 from .io.fm.run_writer import write_run_dimr_bat
@@ -148,6 +149,11 @@ def convert_network_case(
     write_initial_fields_reference(dflowfm_dir / initial_fields_name, initial_water_depth_name)
     created_files.append(dflowfm_dir / initial_fields_name)
 
+    include_morphology = options.activate_morphodynamics and case_model.morphodynamics.has_morphology_switch
+    if include_morphology:
+        mor_file, sed_file = write_morphodynamics_files(dflowfm_dir, case_model.morphodynamics)
+        created_files.extend([mor_file, sed_file])
+
     write_mdu(
         dflowfm_dir / mdu_filename,
         model_name=options.model_name,
@@ -159,7 +165,7 @@ def convert_network_case(
         roughness_file_names=(roughness_file_name,),
         ini_field_file_name=initial_fields_name,
         runtime=case_model.runtime,
-        include_morphology=options.activate_morphodynamics and case_model.morphodynamics.has_morphology_switch,
+        include_morphology=include_morphology,
     )
     created_files.append(dflowfm_dir / mdu_filename)
 

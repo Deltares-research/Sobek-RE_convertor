@@ -37,3 +37,5 @@ def test_read_morphodynamics_summary_detects_source_signals() -> None:
     assert warnings == []
     assert summary.has_morphology_switch is True
     assert summary.branch_count_with_grainsize > 0
+    assert summary.representative_d50_m is not None
+    assert summary.representative_d50_m > 0.0

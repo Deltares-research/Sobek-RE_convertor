@@ -45,7 +45,8 @@ In progress:
 - Morphodynamics first pass:
 	- Source readiness detection is implemented (`DEFICN.*` MPIN + `DEFSUB.*` morphology switch).
 	- Optional MDU sediment block activation is available via `activate_morphodynamics=True`.
-	- Detailed sediment/morph files (`mor.mor`, `sed.sed`) are not generated yet.
+	- Base `mor.mor` and `sed.sed` are now generated from converted source summary values (including representative D50).
+	- Still a simplified mapping; advanced per-fraction/per-location transfer is pending.
 
 Not done yet:
 

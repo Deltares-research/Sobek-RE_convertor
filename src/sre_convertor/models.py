@@ -112,6 +112,7 @@ class BranchInitialCondition:
 class MorphodynamicsSummary:
     branch_count_with_grainsize: int
     has_morphology_switch: bool
+    representative_d50_m: float | None = None
 
 
 @dataclass(frozen=True)
