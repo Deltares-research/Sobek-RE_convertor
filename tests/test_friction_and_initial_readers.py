@@ -39,3 +39,11 @@ def test_read_morphodynamics_summary_detects_source_signals() -> None:
     assert summary.branch_count_with_grainsize > 0
     assert summary.representative_d50_m is not None
     assert summary.representative_d50_m > 0.0
+    assert summary.grain_size_sample_count > 0
+    assert len(summary.sediment_fractions_d50_m) >= 3
+    assert all(value > 0.0 for value in summary.sediment_fractions_d50_m)
+    assert summary.branch_composition
+    first_branch, first_weights = summary.branch_composition[0]
+    assert first_branch
+    assert len(first_weights) == len(summary.sediment_fractions_d50_m)
+    assert abs(sum(first_weights) - 1.0) < 1e-6

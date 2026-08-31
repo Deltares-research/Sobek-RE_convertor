@@ -151,8 +151,8 @@ def convert_network_case(
 
     include_morphology = options.activate_morphodynamics and case_model.morphodynamics.has_morphology_switch
     if include_morphology:
-        mor_file, sed_file = write_morphodynamics_files(dflowfm_dir, case_model.morphodynamics)
-        created_files.extend([mor_file, sed_file])
+        mor_file, sed_file, composition_file = write_morphodynamics_files(dflowfm_dir, case_model.morphodynamics)
+        created_files.extend([mor_file, sed_file, composition_file])
 
     write_mdu(
         dflowfm_dir / mdu_filename,

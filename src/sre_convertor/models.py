@@ -113,6 +113,9 @@ class MorphodynamicsSummary:
     branch_count_with_grainsize: int
     has_morphology_switch: bool
     representative_d50_m: float | None = None
+    sediment_fractions_d50_m: tuple[float, ...] = ()
+    grain_size_sample_count: int = 0
+    branch_composition: tuple[tuple[str, tuple[float, ...]], ...] = ()
 
 
 @dataclass(frozen=True)

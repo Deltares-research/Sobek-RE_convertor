@@ -45,8 +45,10 @@ In progress:
 - Morphodynamics first pass:
 	- Source readiness detection is implemented (`DEFICN.*` MPIN + `DEFSUB.*` morphology switch).
 	- Optional MDU sediment block activation is available via `activate_morphodynamics=True`.
-	- Base `mor.mor` and `sed.sed` are now generated from converted source summary values (including representative D50).
-	- Still a simplified mapping; advanced per-fraction/per-location transfer is pending.
+	- Base `mor.mor` and `sed.sed` are generated from converted source summary values.
+	- `sed.sed` now contains multiple derived sediment fractions (D50 classes) from MPIN grain-size samples.
+	- Branch-aware composition export is generated in `mor.composition.ini` for traceability.
+	- Still simplified: advanced transport options and direct FM underlayer initialization wiring are pending.
 
 Not done yet:
 
@@ -126,6 +128,7 @@ report = convert_case(
 		model_name="converted_case",
 		activate_cross_sections=False,
 )
+```
 
 Enable first-pass morphodynamics block in MDU (experimental):
 
@@ -138,7 +141,6 @@ report = convert_case(
 		model_name="converted_case",
 		activate_morphodynamics=True,
 )
-```
 ```
 
 Runtime success validation:
