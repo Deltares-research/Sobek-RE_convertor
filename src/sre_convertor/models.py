@@ -59,6 +59,9 @@ class CrossSectionDefinition:
     levels: tuple[float, ...]
     flow_widths: tuple[float, ...]
     total_widths: tuple[float, ...]
+    main_width: float = 0.0
+    fp1_width: float = 0.0
+    fp2_width: float = 0.0
 
 
 @dataclass(frozen=True)

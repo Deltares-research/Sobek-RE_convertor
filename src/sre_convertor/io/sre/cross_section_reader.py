@@ -49,6 +49,9 @@ def read_cross_sections(input_dir: Path) -> tuple[tuple[CrossSectionDefinition, 
             levels=tuple(levels),
             flow_widths=tuple(flow_widths),
             total_widths=tuple(total_widths),
+            main_width=_width(record.attrs.get("wm"), max(flow_widths)),
+            fp1_width=_width(record.attrs.get("w1"), 0.0),
+            fp2_width=_width(record.attrs.get("w2"), 0.0),
         )
 
     relation_by_cross_id: dict[str, tuple[str, float]] = {}
@@ -108,3 +111,8 @@ def _as_float(value: str | None, fallback: float | None) -> float | None:
         return float(value)
     except ValueError:
         return fallback
+
+
+def _width(value: str | None, fallback: float) -> float:
+    parsed = _as_float(value, None)
+    return fallback if parsed is None or parsed >= 9.0e9 else parsed

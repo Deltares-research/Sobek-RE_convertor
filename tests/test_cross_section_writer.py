@@ -12,9 +12,14 @@ def test_write_cross_section_definitions_sets_mainwidth_from_flowwidths(tmp_path
         levels=(0.0, 1.0),
         flow_widths=(3.0, 5.5),
         total_widths=(3.0, 5.5),
+        main_width=4.0,
+        fp1_width=1.5,
+        fp2_width=0.5,
     )
 
     write_cross_section_definitions((definition,), target)
 
     text = target.read_text(encoding="utf-8")
-    assert "mainWidth = 5.500000" in text
+    assert "mainWidth = 4.000000" in text
+    assert "fp1Width = 1.500000" in text
+    assert "fp2Width = 0.500000" in text

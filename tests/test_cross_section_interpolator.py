@@ -33,6 +33,9 @@ def test_densify_cross_sections_interpolates_between_known_profiles() -> None:
             levels=(0.0, 1.0),
             flow_widths=(2.0, 4.0),
             total_widths=(2.0, 4.0),
+            main_width=2.0,
+            fp1_width=1.0,
+            fp2_width=0.0,
         ),
         CrossSectionDefinition(
             id="d1",
@@ -40,6 +43,9 @@ def test_densify_cross_sections_interpolates_between_known_profiles() -> None:
             levels=(0.0, 1.0),
             flow_widths=(4.0, 8.0),
             total_widths=(4.0, 8.0),
+            main_width=4.0,
+            fp1_width=2.0,
+            fp2_width=1.0,
         ),
     )
     locations = (
@@ -69,6 +75,9 @@ def test_densify_cross_sections_interpolates_between_known_profiles() -> None:
     middle_def = next(definition for definition in defs_out if definition.id == middle.definition_id)
     assert middle.reference_level == 1.0
     assert middle_def.flow_widths == (3.0, 6.0)
+    assert middle_def.main_width == 3.0
+    assert middle_def.fp1_width == 1.5
+    assert middle_def.fp2_width == 0.5
 
 
 def test_densify_cross_sections_resamples_profiles_when_shapes_differ() -> None:

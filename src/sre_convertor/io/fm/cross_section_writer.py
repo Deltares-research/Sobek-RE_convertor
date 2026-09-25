@@ -19,7 +19,7 @@ def write_cross_section_definitions(
     ]
 
     for definition in definitions:
-        main_width = max(definition.flow_widths) if definition.flow_widths else 1.0
+        main_width = definition.main_width or (max(definition.flow_widths) if definition.flow_widths else 1.0)
         lines.extend(
             [
                 "[Definition]",
@@ -31,8 +31,8 @@ def write_cross_section_definitions(
                 f"   flowWidths = {_format_series(definition.flow_widths)}",
                 f"   totalWidths = {_format_series(definition.total_widths)}",
                 f"   mainWidth = {main_width:.6f}",
-                "   fp1Width = 0.000000",
-                "   fp2Width = 0.000000",
+                f"   fp1Width = {definition.fp1_width:.6f}",
+                f"   fp2Width = {definition.fp2_width:.6f}",
                 "   isShared = 0.000000",
                 "",
             ]

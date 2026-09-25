@@ -187,6 +187,9 @@ def _interpolate_definition(
         levels=_interpolate_series(left_levels, right_levels, ratio),
         flow_widths=_interpolate_series(left_flow_widths, right_flow_widths, ratio),
         total_widths=_interpolate_series(left_total_widths, right_total_widths, ratio),
+        main_width=_interpolate_value(left.main_width, right.main_width, ratio),
+        fp1_width=_interpolate_value(left.fp1_width, right.fp1_width, ratio),
+        fp2_width=_interpolate_value(left.fp2_width, right.fp2_width, ratio),
     )
 
 
@@ -249,6 +252,9 @@ def _process_location_with_unique_copy(
         levels=source_def.levels,
         flow_widths=source_def.flow_widths,
         total_widths=source_def.total_widths,
+        main_width=source_def.main_width,
+        fp1_width=source_def.fp1_width,
+        fp2_width=source_def.fp2_width,
     )
     return (
         CrossSectionLocation(
@@ -302,6 +308,9 @@ def _process_mapped_location_with_unique_copy(
         levels=source_def.levels,
         flow_widths=source_def.flow_widths,
         total_widths=source_def.total_widths,
+        main_width=source_def.main_width,
+        fp1_width=source_def.fp1_width,
+        fp2_width=source_def.fp2_width,
     )
     new_location = CrossSectionLocation(
         id=new_location_id,
