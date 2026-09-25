@@ -23,18 +23,28 @@ def write_boundary_conditions(
 
     for boundary in boundaries:
         is_qh = boundary.quantity == "qhbnd"
-        lines.extend(
-            [
-                "[forcing]",
-                f"    name                  = {boundary.node_name}",
-                "    function              = timeseries",
-                "    time-interpolation    = linear",
-                f"    quantity              = {'waterlevel' if is_qh else 'time'}",
-                f"    unit                  = {'m' if is_qh else f'minutes since {ref}'}",
-                f"    quantity              = {boundary.quantity}",
-                f"    unit                  = {_quantity_unit(boundary.quantity)}",
-            ]
-        )
+        lines.extend(["[forcing]", f"    name                  = {boundary.node_name}"])
+        if is_qh:
+            lines.extend(
+                [
+                    "    function              = qhtable",
+                    "    quantity              = qhbnd discharge",
+                    "    unit                  = m3/s",
+                    "    quantity              = qhbnd waterlevel",
+                    "    unit                  = m",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "    function              = timeseries",
+                    "    time-interpolation    = linear",
+                    "    quantity              = time",
+                    f"    unit                  = minutes since {ref}",
+                    f"    quantity              = {boundary.quantity}",
+                    f"    unit                  = {_quantity_unit(boundary.quantity)}",
+                ]
+            )
 
         points = boundary.series
         if not points:

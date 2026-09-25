@@ -12,15 +12,10 @@ def collect_value_read_details(input_dir: Path, case: SreCaseModel) -> tuple[str
 
     for node in case.network.nodes:
         record = _find_record(records, "NODE", node.id)
-        details.append(
-            f"NODE id={node.id!r} name={node.name!r} x={node.x:g} y={node.y:g} {_source(record)}"
-        )
+        details.append(_detail("Node", (f"id={node.id!r}", f"name={node.name!r}", f"x={node.x:g}", f"y={node.y:g}", _source(record))))
     for branch in case.network.branches:
         record = _find_record(records, "BRCH", branch.id)
-        details.append(
-            f"BRCH id={branch.id!r} name={branch.name!r} from={branch.from_node_id!r} "
-            f"to={branch.to_node_id!r} length={branch.length:g} {_source(record)}"
-        )
+        details.append(_detail("Branch", (f"id={branch.id!r}", f"name={branch.name!r}", f"from={branch.from_node_id!r}", f"to={branch.to_node_id!r}", f"length={branch.length:g}", _source(record))))
 
     for definition in case.cross_section_definitions:
         record = _find_record(records, "CRDS", definition.id)
@@ -30,19 +25,10 @@ def collect_value_read_details(input_dir: Path, case: SreCaseModel) -> tuple[str
             if definition.levels
             else "levels_count=0 levels_min=empty levels_max=empty"
         )
-        details.append(
-            f"cross-section definition id={definition.id!r} name={definition.name!r} "
-            f"{level_summary} main_channel_width={definition.main_width:g} "
-            f"floodplain_1_width={definition.fp1_width:g} floodplain_2_width={definition.fp2_width:g} "
-            f"{_source(record)}"
-        )
+        details.append(_detail("Cross-section definition", (f"id={definition.id!r}", f"name={definition.name!r}", *level_summary.split(), f"main_channel_width={definition.main_width:g}", f"floodplain_1_width={definition.fp1_width:g}", f"floodplain_2_width={definition.fp2_width:g}", _source(record))))
     for location in case.cross_section_locations:
         record = _find_record(records, "CRSN", location.id)
-        details.append(
-            f"cross-section location id={location.id!r} name={location.name!r} "
-            f"branch={location.branch_id!r} chainage={location.chainage:g} definition={location.definition_id!r} "
-            f"reference_level={location.reference_level:g} {_source(record)}"
-        )
+        details.append(_detail("Cross-section location", (f"id={location.id!r}", f"name={location.name!r}", f"branch={location.branch_id!r}", f"chainage={location.chainage:g}", f"definition={location.definition_id!r}", f"reference_level={location.reference_level:g}", _source(record))))
 
     for boundary in case.boundaries:
         record = _find_series_record(records, {"FLBO"}, boundary.id)
@@ -77,45 +63,23 @@ def collect_value_read_details(input_dir: Path, case: SreCaseModel) -> tuple[str
         record = _find_record(records, "BDFR", roughness.branch_id, attribute="ci")
         for section_name, chainages, values in roughness.section_profiles:
             for chainage, value in zip(chainages, values):
-                details.append(
-                    f"roughness branch={roughness.branch_id!r} section={section_name!r} "
-                    f"type={roughness.friction_type!r} chainage={chainage:g} value={value:g} {_source(record)}"
-                )
+                details.append(_detail("Roughness", (f"branch={roughness.branch_id!r}", f"section={section_name!r}", f"type={roughness.friction_type!r}", f"chainage={chainage:g}", f"value={value:g}", _source(record))))
     for initial in case.initial_conditions:
         record = _find_record(records, "FLIN", initial.branch_id, attribute="ci")
-        details.append(
-            f"initial condition branch={initial.branch_id!r} chainage={initial.chainage:g} water_level={initial.water_level:g} {_source(record)}"
-        )
+        details.append(_detail("Initial condition", (f"branch={initial.branch_id!r}", f"chainage={initial.chainage:g}", f"water_level={initial.water_level:g}", _source(record))))
     for structure in case.structures:
         record = _find_record(records, "STRU", structure.id)
-        details.append(
-            f"structure id={structure.id!r} name={structure.name!r} type={structure.structure_type!r} "
-            f"branch={structure.branch_id!r} chainage={structure.chainage:g} crest_level={structure.crest_level:g} "
-            f"crest_width={structure.crest_width:g} {_source(record)}"
-        )
+        details.append(_detail("Structure", (f"id={structure.id!r}", f"name={structure.name!r}", f"type={structure.structure_type!r}", f"branch={structure.branch_id!r}", f"chainage={structure.chainage:g}", f"crest_level={structure.crest_level:g}", f"crest_width={structure.crest_width:g}", _source(record))))
 
-    details.append(
-        f"runtime refdate={case.runtime.refdate.isoformat()} tstart={case.runtime.tstart_seconds} "
-        f"tstop={case.runtime.tstop_seconds} {_source(_first_record(records, "FLTM"))}"
-    )
+    details.append(_detail("Runtime", (f"refdate={case.runtime.refdate.isoformat()}", f"tstart={case.runtime.tstart_seconds}", f"tstop={case.runtime.tstop_seconds}", _source(_first_record(records, "FLTM")))))
     morph = case.morphodynamics
-    details.append(
-        f"morphodynamics morphology_switch={morph.has_morphology_switch} branches_with_grainsize={morph.branch_count_with_grainsize} "
-        f"grain_samples={morph.grain_size_sample_count} d50={morph.representative_d50_m} "
-        f"sediment_fractions={_values(morph.sediment_fractions_d50_m)} {_source(_first_record(records, "MPIN", "SBST", "TRNS"))}"
-    )
+    details.append(_detail("Morphodynamics", (f"morphology_switch={morph.has_morphology_switch}", f"branches_with_grainsize={morph.branch_count_with_grainsize}", f"grain_samples={morph.grain_size_sample_count}", f"d50={morph.representative_d50_m}", f"sediment_fractions={_values(morph.sediment_fractions_d50_m)}", _source(_first_record(records, "MPIN", "SBST", "TRNS")))))
     for controller in case.rtc.controllers:
         record = _find_record(records, "CONT", controller.id)
-        details.append(
-            f"RTC controller id={controller.id!r} name={controller.name!r} type={controller.controller_type!r} "
-            f"parameter={controller.controlled_parameter!r} triggers={controller.trigger_ids} {_source(record)}"
-        )
+        details.append(_detail("RTC controller", (f"id={controller.id!r}", f"name={controller.name!r}", f"type={controller.controller_type!r}", f"parameter={controller.controlled_parameter!r}", f"triggers={controller.trigger_ids}", _source(record))))
     for trigger in case.rtc.triggers:
         record = _find_record(records, "TRIG", trigger.id)
-        details.append(
-            f"RTC trigger id={trigger.id!r} name={trigger.name!r} type={trigger.trigger_type!r} "
-            f"branch={trigger.branch_id!r} chainage={trigger.chainage} {_source(record)}"
-        )
+        details.append(_detail("RTC trigger", (f"id={trigger.id!r}", f"name={trigger.name!r}", f"type={trigger.trigger_type!r}", f"branch={trigger.branch_id!r}", f"chainage={trigger.chainage}", _source(record))))
 
     return tuple(details)
 
@@ -185,4 +149,8 @@ def _series_detail(
         *summary.split(),
         _source(record),
     )
-    return "\n".join([kind.capitalize(), *(f"  {field}" for field in fields)])
+    return _detail(kind.capitalize(), fields)
+
+
+def _detail(title: str, fields: tuple[str, ...]) -> str:
+    return "\n".join([title, *(f"  {field}" for field in fields)])

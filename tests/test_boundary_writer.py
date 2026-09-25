@@ -108,8 +108,10 @@ def test_write_boundary_conditions_preserves_qh_relation_coordinates(tmp_path: P
     write_boundary_conditions(boundaries, runtime, target)
 
     text = target.read_text(encoding="utf-8")
-    assert "quantity              = waterlevel" in text
-    assert "quantity              = qhbnd" in text
+    assert "function              = qhtable" in text
+    assert "quantity              = qhbnd discharge" in text
+    assert "quantity              = qhbnd waterlevel" in text
     assert "unit                  = m3/s" in text
+    assert "unit                  = m" in text
     assert "0\t-0.069100" in text
     assert "20000\t13.219400" in text
