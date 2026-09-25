@@ -8,7 +8,7 @@ import shutil
 import xml.etree.ElementTree as ET
 from xml.sax.saxutils import escape
 
-from ...models import RuntimeSettings, SreRtcController, SreRtcSummary
+from ...models import RuntimeSettings, SreRtcController, SreRtcSummary, SreRtcTrigger
 
 
 @dataclass(frozen=True)
@@ -224,24 +224,30 @@ def _native_tools_config(
     warnings: list[str],
 ) -> str:
     rules: list[str] = []
-    for controller in _selected_output_controllers(summary, warnings):
+    rule_ids_by_controller: dict[str, str] = {}
+    for controller in _synthesizable_controllers(summary, warnings):
         output_id = _controller_output_id(controller)
         if output_id is None:
             warnings.append(f"Controller {controller.id} controls unsupported parameter {controller.controlled_parameter}.")
             continue
 
         if controller.controller_type == "time" and controller.tables:
-            rules.append(_time_relative_rule(controller, output_id))
+            rule_id = _time_rule_id(controller)
+            rules.append(_time_relative_rule(controller, output_id, rule_id))
+            rule_ids_by_controller[controller.id] = rule_id
             continue
 
         table = _numeric_xy_table(controller)
         input_id = _controller_input_id(controller, observation_names)
         if table and input_id:
-            rules.append(_lookup_rule(controller, input_id, output_id, table))
+            rule_id = _lookup_rule_id(controller)
+            rules.append(_lookup_rule(controller, input_id, output_id, table, rule_id))
+            rule_ids_by_controller[controller.id] = rule_id
         else:
             warnings.append(f"Controller {controller.id} was inventoried but could not be synthesized as a D-RTC rule.")
 
     rules_text = "\n".join(f"    <rule>\n{rule}\n    </rule>" for rule in rules)
+    triggers_text = _native_triggers_config(summary, observation_names, rule_ids_by_controller, warnings)
     return f"""<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rtcToolsConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:rtc="http://www.wldelft.nl/fews" xmlns="http://www.wldelft.nl/fews">
     <general>
@@ -252,6 +258,7 @@ def _native_tools_config(
     <rules>
 {rules_text}
     </rules>
+{triggers_text}
 </rtcToolsConfig>
 """
 
@@ -262,11 +269,22 @@ def _native_data_config(summary: SreRtcSummary, observation_names: dict[tuple[st
         import_items.append(_time_series_xml(f"[Input]{observation_name}/Water level (op)", observation_name, "Water level (op)"))
 
     export_items: list[str] = []
-    for controller in _selected_output_controllers(summary, []):
+    seen_export_ids: set[str] = set()
+    for controller in _synthesizable_controllers(summary, []):
         output_id = _controller_output_id(controller)
         if output_id is None or controller.controlled_structure_id is None:
             continue
+        if output_id in seen_export_ids:
+            continue
+        seen_export_ids.add(output_id)
         export_items.append(_time_series_xml(output_id, controller.controlled_structure_id, "Crest level (s)"))
+        if controller.controller_type == "time":
+            export_items.append(_empty_time_series_xml(_time_active_id(controller)))
+    for controller in summary.controllers:
+        for trigger_id in controller.trigger_ids[:1]:
+            trigger = next((item for item in summary.triggers if item.id == trigger_id), None)
+            if trigger is not None:
+                export_items.append(_empty_time_series_xml(_trigger_status_id(controller, trigger)))
 
     return f"""<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rtcDataConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:rtc="http://www.wldelft.nl/fews" xmlns="http://www.wldelft.nl/fews">
@@ -300,10 +318,12 @@ def _state_pi_config(runtime: RuntimeSettings) -> str:
 
 def _state_import_config(summary: SreRtcSummary) -> str:
     leaves = []
-    for controller in _selected_output_controllers(summary, []):
+    seen_leaf_ids: set[str] = set()
+    for controller in _synthesizable_controllers(summary, []):
         output_id = _controller_output_id(controller)
-        if output_id is None:
+        if output_id is None or output_id in seen_leaf_ids:
             continue
+        seen_leaf_ids.add(output_id)
         leaves.append(f"    <treeVectorLeaf id=\"{escape(output_id)}\">\n      <vector>{_initial_controller_value(controller):g}</vector>\n    </treeVectorLeaf>\n")
     return f"""<?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <treeVectorFile xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.openda.org">
@@ -319,52 +339,52 @@ def _controller_output_id(controller: SreRtcController) -> str | None:
     return f"[Output]{controller.controlled_structure_id}/Crest level (s)"
 
 
-def _selected_output_controllers(summary: SreRtcSummary, warnings: list[str]) -> tuple[SreRtcController, ...]:
-    priority = {"pid": 0, "hydraulic": 1, "time": 2}
-    selected: dict[str, SreRtcController] = {}
-    for controller in sorted(summary.controllers, key=lambda item: priority.get(item.controller_type, 9)):
+def _synthesizable_controllers(summary: SreRtcSummary, warnings: list[str]) -> tuple[SreRtcController, ...]:
+    selected: list[SreRtcController] = []
+    for controller in summary.controllers:
         output_id = _controller_output_id(controller)
         if output_id is None:
             warnings.append(f"Controller {controller.id} controls unsupported parameter {controller.controlled_parameter}.")
             continue
-        if output_id in selected:
-            warnings.append(
-                f"Controller {controller.id} was skipped because controller {selected[output_id].id} "
-                f"already controls {output_id}."
-            )
-            continue
-        selected[output_id] = controller
-    return tuple(selected.values())
+        selected.append(controller)
+    return tuple(selected)
 
 
 def _controller_input_id(controller: SreRtcController, observation_names: dict[tuple[str, float], str]) -> str | None:
-        if controller.observation_branch_id is None or controller.observation_chainage is None:
-                return None
-        observation_name = observation_names.get((controller.observation_branch_id, controller.observation_chainage))
-        if observation_name is None:
-                return None
-        return f"[Input]{observation_name}/Water level (op)"
+    if controller.observation_branch_id is None or controller.observation_chainage is None:
+        return None
+    observation_name = observation_names.get((controller.observation_branch_id, controller.observation_chainage))
+    if observation_name is None:
+        return None
+    return f"[Input]{observation_name}/Water level (op)"
 
 
-def _time_relative_rule(controller: SreRtcController, output_id: str) -> str:
-        rows = _time_controller_rows(controller)
-        records = "".join(f"          <record time=\"{time:g}\" value=\"{value:g}\" />\n" for time, value in rows)
-        return f"""      <timeRelative id="[RelativeTimeRule]SRE/{escape(controller.name)}">
-                <mode>RETAINVALUEWHENINACTIVE</mode>
-                <valueOption>ABSOLUTE</valueOption>
-                <maximumPeriod>0</maximumPeriod>
-                <interpolationOption>LINEAR</interpolationOption>
-                <controlTable>
+def _time_relative_rule(controller: SreRtcController, output_id: str, rule_id: str) -> str:
+    rows = _time_controller_rows(controller)
+    records = "".join(f"          <record time=\"{time:g}\" value=\"{value:g}\" />\n" for time, value in rows)
+    return f"""      <timeRelative id="{escape(rule_id)}">
+        <mode>RETAINVALUEWHENINACTIVE</mode>
+        <valueOption>ABSOLUTE</valueOption>
+        <maximumPeriod>0</maximumPeriod>
+        <interpolationOption>LINEAR</interpolationOption>
+        <controlTable>
 {records}        </controlTable>
-                <output>
-                    <y>{escape(output_id)}</y>
-                </output>
-            </timeRelative>"""
+        <output>
+          <y>{escape(output_id)}</y>
+                    <timeActive>{escape(_time_active_id(controller))}</timeActive>
+        </output>
+      </timeRelative>"""
 
 
-def _lookup_rule(controller: SreRtcController, input_id: str, output_id: str, rows: tuple[tuple[float, float], ...]) -> str:
+def _lookup_rule(
+    controller: SreRtcController,
+    input_id: str,
+    output_id: str,
+    rows: tuple[tuple[float, float], ...],
+    rule_id: str,
+) -> str:
         records = "".join(f"          <record x=\"{x:g}\" y=\"{y:g}\" />\n" for x, y in rows)
-        return f"""      <lookupTable id="[LookupSignal]SRE/{escape(controller.name)}">
+        return f"""      <lookupTable id="{escape(rule_id)}">
                 <table>
 {records}        </table>
                 <interpolationOption>LINEAR</interpolationOption>
@@ -379,50 +399,154 @@ def _lookup_rule(controller: SreRtcController, input_id: str, output_id: str, ro
 
 
 def _time_series_xml(series_id: str, element_id: str, quantity_id: str) -> str:
-        return f"""    <timeSeries id="{escape(series_id)}">
-            <OpenMIExchangeItem>
-                <elementId>{escape(element_id)}</elementId>
-                <quantityId>{escape(quantity_id)}</quantityId>
-                <unit>m</unit>
-            </OpenMIExchangeItem>
-        </timeSeries>
+    return f"""    <timeSeries id="{escape(series_id)}">
+      <OpenMIExchangeItem>
+        <elementId>{escape(element_id)}</elementId>
+        <quantityId>{escape(quantity_id)}</quantityId>
+        <unit>m</unit>
+      </OpenMIExchangeItem>
+    </timeSeries>
 """
 
 
+def _empty_time_series_xml(series_id: str) -> str:
+    return f"""    <timeSeries id="{escape(series_id)}" />
+"""
+
+
+def _native_triggers_config(
+    summary: SreRtcSummary,
+    observation_names: dict[tuple[str, float], str],
+    rule_ids_by_controller: dict[str, str],
+    warnings: list[str],
+) -> str:
+    triggers_by_id = {trigger.id: trigger for trigger in summary.triggers}
+    trigger_blocks: list[str] = []
+    for controller in summary.controllers:
+        rule_id = rule_ids_by_controller.get(controller.id)
+        if rule_id is None or not controller.trigger_ids:
+            continue
+
+        trigger_id = controller.trigger_ids[0]
+        trigger = triggers_by_id.get(trigger_id)
+        if trigger is None:
+            continue
+
+        input_id = _trigger_input_id(trigger, observation_names)
+        threshold, operation = _trigger_threshold_and_operation(trigger)
+        if input_id is None or threshold is None:
+            warnings.append(f"Trigger {trigger.id} for controller {controller.id} could not be synthesized.")
+            continue
+        if len(controller.trigger_ids) > 1:
+            warnings.append(
+                f"Controller {controller.id} uses multiple SRE triggers; native D-RTC synthesis currently uses {trigger_id}."
+            )
+
+        trigger_blocks.append(_standard_trigger(trigger, controller, input_id, threshold, operation, rule_id))
+
+    if not trigger_blocks:
+        return ""
+
+    joined = "\n".join(f"    <trigger>\n{block}\n    </trigger>" for block in trigger_blocks)
+    return f"""    <triggers>
+{joined}
+    </triggers>"""
+
+
+def _standard_trigger(
+    trigger: SreRtcTrigger,
+    controller: SreRtcController,
+    input_id: str,
+    threshold: float,
+    operation: str | None,
+    rule_id: str,
+) -> str:
+    operator = "GreaterEqual" if operation == "1" else "Less"
+    return f"""      <standard id="[StandardCondition]SRE/{escape(controller.name)}/{escape(trigger.name)}">
+        <condition>
+          <x1Series ref="EXPLICIT">{escape(input_id)}</x1Series>
+          <relationalOperator>{operator}</relationalOperator>
+          <x2Value>{threshold:g}</x2Value>
+        </condition>
+        <true>
+          <trigger>
+            <ruleReference>{escape(rule_id)}</ruleReference>
+          </trigger>
+        </true>
+        <output>
+                    <status>{escape(_trigger_status_id(controller, trigger))}</status>
+        </output>
+      </standard>"""
+
+
+def _trigger_status_id(controller: SreRtcController, trigger: SreRtcTrigger) -> str:
+        return f"[Status]SRE/{controller.name}/{trigger.name}"
+
+
+def _trigger_input_id(trigger: SreRtcTrigger, observation_names: dict[tuple[str, float], str]) -> str | None:
+    if trigger.branch_id is None or trigger.chainage is None:
+        return None
+    observation_name = observation_names.get((trigger.branch_id, trigger.chainage))
+    if observation_name is None:
+        return None
+    return f"[Input]{observation_name}/Water level (op)"
+
+
+def _trigger_threshold_and_operation(trigger: SreRtcTrigger) -> tuple[float | None, str | None]:
+    if not trigger.tables or not trigger.tables[0]:
+        return None, None
+    row = trigger.tables[0][0]
+    threshold = _as_float(row[4]) if len(row) >= 5 else None
+    operation = row[3] if len(row) >= 4 else None
+    return threshold, operation
+
+
+def _time_rule_id(controller: SreRtcController) -> str:
+    return f"[RelativeTimeRule]SRE/{controller.name}"
+
+
+def _time_active_id(controller: SreRtcController) -> str:
+    return f"[Status]SRE/{controller.name}/timeActive"
+
+
+def _lookup_rule_id(controller: SreRtcController) -> str:
+    return f"[LookupSignal]SRE/{controller.name}"
+
+
 def _time_controller_rows(controller: SreRtcController) -> tuple[tuple[float, float], ...]:
-        table = controller.tables[0] if controller.tables else tuple()
-        values = [_as_float(row[1]) for row in table if len(row) >= 2 and _as_float(row[1]) is not None]
-        if not values:
-                return ((0.0, 0.0),)
-        if len(set(values)) == 1:
-                return ((0.0, values[0]), (3600.0, values[0]))
-        return tuple((float(idx * 3600), value) for idx, value in enumerate(values))
+    table = controller.tables[0] if controller.tables else tuple()
+    values = [_as_float(row[1]) for row in table if len(row) >= 2 and _as_float(row[1]) is not None]
+    if not values:
+        return ((0.0, 0.0),)
+    if len(set(values)) == 1:
+        return ((0.0, values[0]), (3600.0, values[0]))
+    return tuple((float(idx * 3600), value) for idx, value in enumerate(values))
 
 
 def _numeric_xy_table(controller: SreRtcController) -> tuple[tuple[float, float], ...]:
-        for table in controller.tables:
-                rows: list[tuple[float, float]] = []
-                for row in table:
-                        if len(row) < 2:
-                                continue
-                        x = _as_float(row[0])
-                        y = _as_float(row[1])
-                        if x is None or y is None:
-                                rows = []
-                                break
-                        rows.append((x, y))
-                if rows:
-                        return tuple(rows)
-        return tuple()
+    for table in controller.tables:
+        rows: list[tuple[float, float]] = []
+        for row in table:
+            if len(row) < 2:
+                continue
+            x = _as_float(row[0])
+            y = _as_float(row[1])
+            if x is None or y is None:
+                rows = []
+                break
+            rows.append((x, y))
+        if rows:
+            return tuple(rows)
+    return tuple()
 
 
 def _initial_controller_value(controller: SreRtcController) -> float:
-        rows = _numeric_xy_table(controller) or _time_controller_rows(controller)
-        return rows[0][1] if rows else 0.0
+    rows = _numeric_xy_table(controller) or _time_controller_rows(controller)
+    return rows[0][1] if rows else 0.0
 
 
 def _as_float(value: str) -> float | None:
-        try:
-                return float(value)
-        except ValueError:
-                return None
+    try:
+        return float(value)
+    except ValueError:
+        return None

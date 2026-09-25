@@ -63,11 +63,14 @@ def test_write_native_rtc_package_from_sre_inventory(tmp_path: Path) -> None:
     ET.parse(tmp_path / "rtc" / "rtcDataConfig.xml")
     assert observation_path is not None
     assert "SRE_RTC_99938_34000" in observation_path.read_text(encoding="utf-8")
-    assert "[RelativeTimeRule]SRE/Driel_open" not in tools_text
+    assert "[RelativeTimeRule]SRE/Driel_open" in tools_text
     assert "[LookupSignal]SRE/Driel PID" in tools_text
+    assert "<triggers>" in tools_text
+    assert "[StandardCondition]SRE/Driel PID/Driel Closing" in tools_text
+    assert "<ruleReference>[LookupSignal]SRE/Driel PID</ruleReference>" in tools_text
     assert "[Input]SRE_RTC_99938_34000/Water level (op)" in data_text
     assert "[Output]ST_73326/Crest level (s)" in data_text
     assert any(item.source_name == "observations/SRE_RTC_99938_34000/water_level" for item in coupling.flow_to_rtc)
     assert any(item.target_name == "weirs/ST_73326/CrestLevel" for item in coupling.rtc_to_flow)
     assert any("unsupported parameter gate_height" in warning for warning in package_warnings)
-    assert any("73319" in warning and "73321" in warning for warning in package_warnings)
+    assert any("multiple SRE triggers" in warning for warning in package_warnings)
