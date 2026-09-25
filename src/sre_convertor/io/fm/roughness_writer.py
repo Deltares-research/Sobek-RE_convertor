@@ -31,10 +31,12 @@ def write_roughness(
     for branch in network.branches:
         roughness = source_roughness.get(branch.id)
         friction_type = "Manning"
-        friction_value = 0.03
+        chainages = (0.0,)
+        friction_values = (0.03,)
         if roughness is not None and roughness.friction_type.lower() == "chezy":
             friction_type = "Chezy"
-            friction_value = roughness.value
+            chainages = roughness.chainages
+            friction_values = roughness.values
 
         lines.extend(
             [
@@ -42,9 +44,9 @@ def write_roughness(
                 f"    branchId              = #{display_names[branch.id]}#",
                 f"    frictionType          = {friction_type}",
                 "    functionType          = constant",
-                "    numLocations          = 1",
-                "    chainage              = 0.000",
-                f"    frictionValues        = {friction_value:.5f}",
+                f"    numLocations          = {len(chainages)}",
+                f"    chainage              = {' '.join(f'{chainage:.3f}' for chainage in chainages)}",
+                f"    frictionValues        = {' '.join(f'{value:.5f}' for value in friction_values)}",
                 "",
             ]
         )

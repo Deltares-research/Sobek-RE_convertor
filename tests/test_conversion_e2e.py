@@ -117,6 +117,7 @@ def test_convert_case_creates_requested_plots(tmp_path: Path) -> None:
     timeseries_paths = tuple((output_dir / "fig").glob("timeseries_*.png"))
     branch_figure_paths = tuple((output_dir / "fig").glob("initial_sediment_composition_branch_*.png"))
     initial_condition_paths = tuple((output_dir / "fig").glob("initial_condition_branch_*.png"))
+    friction_paths = tuple((output_dir / "fig").glob("friction_branch_*.png"))
     assert figure_paths.issubset(set(report.files_created))
     assert all(path.exists() and path.stat().st_size > 0 for path in figure_paths)
     assert timeseries_paths
@@ -125,6 +126,8 @@ def test_convert_case_creates_requested_plots(tmp_path: Path) -> None:
     assert all(path in report.files_created and path.stat().st_size > 0 for path in branch_figure_paths)
     assert initial_condition_paths
     assert all(path in report.files_created and path.stat().st_size > 0 for path in initial_condition_paths)
+    assert friction_paths
+    assert all(path in report.files_created and path.stat().st_size > 0 for path in friction_paths)
 
 
 @pytest.mark.integration
@@ -161,12 +164,23 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "maximum=" in log_text
     assert "time_series=[" not in log_text
     assert "cross-section definition id=" in log_text
+    assert "levels_count=" in log_text
+    assert "levels_min=" in log_text
+    assert "levels_max=" in log_text
+    assert "levels=[" not in log_text
     assert "roughness branch=" in log_text
     assert "initial condition branch=" in log_text
     assert "structure id=" in log_text
     assert "DEFTOP source records:" in log_text
     assert "Grid connectivity:" in log_text
     assert "Generated grid points:" in log_text
+    assert "start=" in log_text
+    assert "end=" in log_text
+    assert "length=" in log_text
+    assert "average_step=" in log_text
+    assert "minimum_step=" in log_text
+    assert "maximum_step=" in log_text
+    assert "chainages=" not in log_text
     assert "dflowfm/demo_case_log_net.nc" in log_text
     assert "dflowfm/demo_case_log.mdu" in log_text
     assert "conversion.log" not in log_text

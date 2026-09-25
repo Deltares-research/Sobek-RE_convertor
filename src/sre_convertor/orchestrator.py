@@ -272,6 +272,7 @@ def convert_network_case(
                 layer_composition=case_model.morphodynamics.layer_composition,
                 layer_count=case_model.morphodynamics.underlayer_count,
                 initial_conditions=case_model.initial_conditions,
+                roughness=case_model.roughness,
             )
         )
     log_path = write_conversion_log(

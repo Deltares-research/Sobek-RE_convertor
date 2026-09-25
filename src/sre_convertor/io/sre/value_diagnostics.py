@@ -24,9 +24,15 @@ def collect_value_read_details(input_dir: Path, case: SreCaseModel) -> tuple[str
 
     for definition in case.cross_section_definitions:
         record = _find_record(records, "CRDS", definition.id)
+        level_summary = (
+            f"levels_count={len(definition.levels)} "
+            f"levels_min={min(definition.levels):g} levels_max={max(definition.levels):g}"
+            if definition.levels
+            else "levels_count=0 levels_min=empty levels_max=empty"
+        )
         details.append(
             f"cross-section definition id={definition.id!r} name={definition.name!r} "
-            f"rows={len(definition.levels)} levels={_values(definition.levels)} {_source(record)}"
+            f"{level_summary} {_source(record)}"
         )
     for location in case.cross_section_locations:
         record = _find_record(records, "CRSN", location.id)

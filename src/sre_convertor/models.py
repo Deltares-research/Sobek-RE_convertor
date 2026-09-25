@@ -144,7 +144,12 @@ class RuntimeSettings:
 class BranchRoughness:
     branch_id: str
     friction_type: str
-    value: float
+    chainages: tuple[float, ...]
+    values: tuple[float, ...]
+
+    @property
+    def value(self) -> float:
+        return sum(self.values) / len(self.values)
 
 
 @dataclass(frozen=True)

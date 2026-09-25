@@ -16,12 +16,14 @@ def read_friction(input_dir: Path) -> tuple[tuple[BranchRoughness, ...], list[st
         if not branch_id:
             continue
 
+        chainages: list[float] = []
         values: list[float] = []
         if record.tables:
             for row in record.tables[0]:
                 if len(row) < 2:
                     continue
                 try:
+                    chainages.append(float(row[0]))
                     values.append(float(row[1]))
                 except ValueError:
                     continue
@@ -30,12 +32,11 @@ def read_friction(input_dir: Path) -> tuple[tuple[BranchRoughness, ...], list[st
             warnings.append(f"DEFFRC branch {branch_id} has no valid friction values; using default roughness.")
             continue
 
-        # FM roughness writer currently uses one representative value per branch.
-        representative = sum(values) / len(values)
         roughness_by_branch[branch_id] = BranchRoughness(
             branch_id=branch_id,
             friction_type="Chezy",
-            value=representative,
+            chainages=tuple(chainages),
+            values=tuple(values),
         )
 
     roughness = tuple(roughness_by_branch[key] for key in sorted(roughness_by_branch.keys()))

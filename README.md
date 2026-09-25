@@ -151,7 +151,7 @@ report = convert_case(
 )
 ```
 
-This creates one `fig/timeseries_<type>_<id>.png` file per time series, `fig/grid.png`, the aggregate `fig/initial_sediment_composition.png`, one `fig/initial_sediment_composition_branch_<id>.png` plot per branch, and one `fig/initial_condition_branch_<id>.png` plot per branch.
+This creates one `fig/timeseries_<type>_<id>.png` file per time series, `fig/grid.png`, the aggregate `fig/initial_sediment_composition.png`, one `fig/initial_sediment_composition_branch_<id>.png` plot per branch, one `fig/initial_condition_branch_<id>.png` plot per branch, and one `fig/friction_branch_<id>.png` plot per branch.
 
 Enable first-pass morphodynamics block in MDU (experimental):
 

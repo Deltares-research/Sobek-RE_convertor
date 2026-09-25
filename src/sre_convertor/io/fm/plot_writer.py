@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from ...models import (
     BoundaryCondition,
     BranchInitialCondition,
+    BranchRoughness,
     LayerCompositionSample,
     LateralDischarge,
     NetworkModel,
@@ -28,6 +29,7 @@ def write_conversion_plots(
     layer_composition: tuple[LayerCompositionSample, ...] = (),
     layer_count: int | None = None,
     initial_conditions: tuple[BranchInitialCondition, ...] = (),
+    roughness: tuple[BranchRoughness, ...] = (),
 ) -> tuple[Path, ...]:
     target_dir.mkdir(parents=True, exist_ok=True)
     timeseries_paths = _write_timeseries_plots(target_dir, boundaries, laterals)
@@ -44,6 +46,7 @@ def write_conversion_plots(
     )
     _write_sediment_composition_plot(paths[len(timeseries_paths) + 1], sediment_fractions, branch_composition)
     paths = paths + _write_initial_condition_plots(target_dir, initial_conditions)
+    paths = paths + _write_friction_plots(target_dir, roughness)
     return paths
 
 
@@ -133,6 +136,45 @@ def _write_initial_condition_plots(
     path = target_dir / "initial_condition.png"
     figure, axis = plt.subplots(figsize=(11, 6))
     axis.text(0.5, 0.5, "No initial conditions found", ha="center", va="center", transform=axis.transAxes)
+    axis.set_axis_off()
+    figure.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(figure)
+    return (path,)
+
+
+def _write_friction_plots(
+    target_dir: Path,
+    roughness: tuple[BranchRoughness, ...],
+) -> tuple[Path, ...]:
+    paths: list[Path] = []
+    for branch_roughness in roughness:
+        if not branch_roughness.chainages or not branch_roughness.values:
+            continue
+
+        figure, axis = plt.subplots(figsize=(11, 6))
+        axis.plot(
+            branch_roughness.chainages,
+            branch_roughness.values,
+            color="#e07a5f",
+            marker="o",
+            markersize=3,
+        )
+        axis.set_title(f"Friction coefficient: branch {branch_roughness.branch_id}")
+        axis.set_xlabel("Chainage")
+        axis.set_ylabel(branch_roughness.friction_type)
+        axis.grid(True, alpha=0.25)
+        figure.tight_layout()
+        path = target_dir / f"friction_branch_{branch_roughness.branch_id}.png"
+        figure.savefig(path, dpi=150)
+        plt.close(figure)
+        paths.append(path)
+
+    if paths:
+        return tuple(paths)
+
+    path = target_dir / "friction.png"
+    figure, axis = plt.subplots(figsize=(11, 6))
+    axis.text(0.5, 0.5, "No friction profiles found", ha="center", va="center", transform=axis.transAxes)
     axis.set_axis_off()
     figure.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(figure)

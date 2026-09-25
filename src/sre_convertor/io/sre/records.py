@@ -97,6 +97,11 @@ def _parse_record(lines: list[str], source_file: Path, source_line_start: int, s
                 i += 1
                 continue
 
+            if i + 1 < len(payload) and payload[i + 1].upper() == "TBLE":
+                current_table = []
+                i += 2
+                continue
+
             if i + 1 >= len(payload):
                 break
 

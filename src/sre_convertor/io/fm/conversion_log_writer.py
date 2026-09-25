@@ -43,9 +43,20 @@ def _network_read_lines(report: ConversionReport) -> list[str]:
             point_count = len(_grid_offsets(chainages, branch[2]))
         grid_points += point_count
         grid_edges += max(point_count - 1, 0)
+        start_chainage = chainages[0] if chainages else None
+        end_chainage = chainages[-1] if chainages else None
+        steps = tuple(
+            right - left
+            for left, right in zip(chainages, chainages[1:])
+        )
         lines.append(
             f"- {filename} lines {start}-{end}: GRID branch {branch_id}; "
-            f"chainages={', '.join(_format_number(value) for value in chainages)}; "
+            f"start={_format_optional_number(start_chainage)}; "
+            f"end={_format_optional_number(end_chainage)}; "
+            f"length={_format_optional_number(end_chainage - start_chainage) if start_chainage is not None and end_chainage is not None else 'empty'}; "
+            f"average_step={_format_optional_number(sum(steps) / len(steps)) if steps else 'empty'}; "
+            f"minimum_step={_format_optional_number(min(steps)) if steps else 'empty'}; "
+            f"maximum_step={_format_optional_number(max(steps)) if steps else 'empty'}; "
             f"grid points={point_count}; grid edges={max(point_count - 1, 0)}"
         )
     lines.append(f"Source network nodes: {len(diagnostics.topology_node_lines)}")
@@ -77,6 +88,10 @@ def _value_read_lines(report: ConversionReport) -> list[str]:
 
 def _format_number(value: float) -> str:
     return f"{value:g}"
+
+
+def _format_optional_number(value: float | None) -> str:
+    return "empty" if value is None else _format_number(value)
 
 
 def _grid_offsets(chainages: tuple[float, ...], branch_length: float) -> tuple[float, ...]:
