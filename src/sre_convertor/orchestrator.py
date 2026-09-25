@@ -158,9 +158,21 @@ def convert_network_case(
         )
         created_files.append(dflowfm_dir / structure_file_name)
 
-    roughness_file_name = "roughness-Main.ini"
-    write_roughness(case_model.network, case_model.roughness, dflowfm_dir / roughness_file_name)
-    created_files.append(dflowfm_dir / roughness_file_name)
+    roughness_file_names = (
+        "roughness-Main.ini",
+        "roughness-FloodPlain1.ini",
+        "roughness-FloodPlain2.ini",
+    )
+    roughness_ids = ("Main", "FloodPlain1", "FloodPlain2")
+    for roughness_file_name, friction_id in zip(roughness_file_names, roughness_ids):
+        roughness_path = dflowfm_dir / roughness_file_name
+        write_roughness(
+            case_model.network,
+            case_model.roughness,
+            roughness_path,
+            friction_id=friction_id,
+        )
+        created_files.append(roughness_path)
 
     initial_water_depth_name = "InitialWaterDepth.ini"
     write_initial_water_depth(
@@ -228,7 +240,7 @@ def convert_network_case(
         cross_loc_file_name=cross_loc_name,
         cross_def_file_name=cross_def_name,
         structure_file_name=structure_file_name,
-        roughness_file_names=(roughness_file_name,),
+        roughness_file_names=roughness_file_names,
         ini_field_file_name=initial_fields_name,
         runtime=case_model.runtime,
         observation_file_name=observation_file_name,

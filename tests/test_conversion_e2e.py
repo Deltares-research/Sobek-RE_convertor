@@ -148,10 +148,13 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "test_duration_seconds = 7200" in log_text
     assert "activate_morphodynamics = False" in log_text
     assert "activate_rtc = False" in log_text
+    assert "include_input_files = False" in log_text
+    assert "include_input_read_details = False" in log_text
     assert "DEFTOP.1" in log_text
+    assert "Input files discovered" not in log_text
     assert "read_cross_sections" in log_text
     assert "Network input read details" in log_text
-    assert "All input file read details" in log_text
+    assert "All input file read details" not in log_text
     assert "DEFCND.1: read " in log_text
     assert "DEFCRS.1 lines " in log_text
     assert "DEFICN.1: read " in log_text
@@ -168,6 +171,9 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "levels_min=" in log_text
     assert "levels_max=" in log_text
     assert "levels=[" not in log_text
+    assert "main_channel_width=" in log_text
+    assert "floodplain_1_width=" in log_text
+    assert "floodplain_2_width=" in log_text
     assert "roughness branch=" in log_text
     assert "initial condition branch=" in log_text
     assert "structure id=" in log_text

@@ -149,6 +149,7 @@ class BranchRoughness:
     friction_type: str
     chainages: tuple[float, ...]
     values: tuple[float, ...]
+    section_profiles: tuple[tuple[str, tuple[float, ...], tuple[float, ...]], ...] = ()
 
     @property
     def value(self) -> float:
@@ -221,6 +222,8 @@ class ConversionOptions:
     activate_rtc: bool = False
     rtc_source_dir: Path | None = None
     create_plots: bool = False
+    include_input_files: bool = False
+    include_input_read_details: bool = False
 
 
 @dataclass

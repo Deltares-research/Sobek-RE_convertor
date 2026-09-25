@@ -33,6 +33,7 @@ def write_cross_section_definitions(
                 f"   mainWidth = {main_width:.6f}",
                 f"   fp1Width = {definition.fp1_width:.6f}",
                 f"   fp2Width = {definition.fp2_width:.6f}",
+                "   frictionIds = #Main#;#FloodPlain1#;#FloodPlain2#",
                 "   isShared = 0.000000",
                 "",
             ]

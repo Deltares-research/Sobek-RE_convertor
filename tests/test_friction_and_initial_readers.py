@@ -16,8 +16,14 @@ def test_read_friction_extracts_branch_chezy_values() -> None:
     by_branch = {item.branch_id: item for item in roughness}
     assert "7262" in by_branch
     assert by_branch["7262"].friction_type == "Chezy"
+    assert [profile[0] for profile in by_branch["7262"].section_profiles] == [
+        "Main channel", "Floodplain 1", "Floodplain 2"
+    ]
+    assert by_branch["7262"].section_profiles[1][2] == by_branch["7262"].section_profiles[0][2]
+    assert by_branch["7262"].section_profiles[2][2] == by_branch["7262"].section_profiles[0][2]
     assert by_branch["7262"].chainages == (0.0, 12500.0, 13000.0, 43500.0, 44000.0, 68000.0, 69000.0, 93500.0)
     assert by_branch["7262"].values == (39.0, 45.0, 45.0, 52.0, 52.0, 52.0, 49.0, 50.0)
+    assert all(values == by_branch["7262"].values for _, _, values in by_branch["7262"].section_profiles)
     assert by_branch["7262"].value > 40.0
 
 
@@ -37,12 +43,24 @@ def test_read_conditions_extracts_lateral_discharge_tables() -> None:
     input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
 
     network = read_sre_network(input_dir)
-    _, laterals, warnings = read_conditions(input_dir, network)
+    boundaries, laterals, warnings = read_conditions(input_dir, network)
 
     assert warnings == []
+    by_id = {boundary.id: boundary for boundary in boundaries}
+    assert by_id["815"].quantity == "dischargebnd"
+    assert by_id["14304"].quantity == "waterlevelbnd"
+    assert by_id["14305"].quantity == "waterlevelbnd"
     by_name = {lateral.name: lateral for lateral in laterals}
     assert [point.value for point in by_name["Driel_Up"].series] == [0.0, 0.0, 0.0, -30.0, -30.0, -30.0]
     assert [point.value for point in by_name["Amero_up"].series] == [0.0, 0.0, -30.0, -30.0]
+    assert [point.time for point in by_name["Driel_Up"].series] == [
+        "2149/12/31;00:00:00",
+        "2150/01/01;00:00:00",
+        "2150/01/02;00:00:00",
+        "2150/01/03;00:00:00",
+        "2150/01/04;00:00:00",
+        "2150/01/05;00:00:00",
+    ]
 
 
 def test_read_morphodynamics_summary_detects_source_signals() -> None:

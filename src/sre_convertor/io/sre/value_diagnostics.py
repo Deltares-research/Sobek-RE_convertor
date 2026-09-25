@@ -32,7 +32,9 @@ def collect_value_read_details(input_dir: Path, case: SreCaseModel) -> tuple[str
         )
         details.append(
             f"cross-section definition id={definition.id!r} name={definition.name!r} "
-            f"{level_summary} {_source(record)}"
+            f"{level_summary} main_channel_width={definition.main_width:g} "
+            f"floodplain_1_width={definition.fp1_width:g} floodplain_2_width={definition.fp2_width:g} "
+            f"{_source(record)}"
         )
     for location in case.cross_section_locations:
         record = _find_record(records, "CRSN", location.id)

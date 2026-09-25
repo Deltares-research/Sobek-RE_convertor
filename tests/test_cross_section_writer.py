@@ -23,3 +23,4 @@ def test_write_cross_section_definitions_sets_mainwidth_from_flowwidths(tmp_path
     assert "mainWidth = 4.000000" in text
     assert "fp1Width = 1.500000" in text
     assert "fp2Width = 0.500000" in text
+    assert "frictionIds = #Main#;#FloodPlain1#;#FloodPlain2#" in text

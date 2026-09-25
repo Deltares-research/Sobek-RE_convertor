@@ -148,21 +148,21 @@ def _write_friction_plots(
 ) -> tuple[Path, ...]:
     paths: list[Path] = []
     for branch_roughness in roughness:
-        if not branch_roughness.chainages or not branch_roughness.values:
+        profiles = branch_roughness.section_profiles or (
+            ("Main channel", branch_roughness.chainages, branch_roughness.values),
+        )
+        profiles = tuple(profile for profile in profiles if profile[1] and profile[2])
+        if not profiles:
             continue
 
         figure, axis = plt.subplots(figsize=(11, 6))
-        axis.plot(
-            branch_roughness.chainages,
-            branch_roughness.values,
-            color="#e07a5f",
-            marker="o",
-            markersize=3,
-        )
+        for section_index, (section_name, chainages, values) in enumerate(profiles):
+            axis.plot(chainages, values, marker="o", markersize=3, label=section_name)
         axis.set_title(f"Friction coefficient: branch {branch_roughness.branch_id}")
         axis.set_xlabel("Chainage")
         axis.set_ylabel(branch_roughness.friction_type)
         axis.grid(True, alpha=0.25)
+        axis.legend(loc="best")
         figure.tight_layout()
         path = target_dir / f"friction_branch_{branch_roughness.branch_id}.png"
         figure.savefig(path, dpi=150)

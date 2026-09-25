@@ -112,7 +112,6 @@ def write_conversion_log(
     network_only: bool,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    input_files = sorted(path for path in input_dir.rglob("*") if path.is_file())
     output_files = [path for path in report.files_created if path != output_path]
 
     lines = [
@@ -133,17 +132,25 @@ def write_conversion_log(
         f"activate_morphodynamics = {options.activate_morphodynamics}",
         f"activate_rtc = {options.activate_rtc}",
         f"rtc_source_dir = {options.rtc_source_dir}",
-        "",
-        "Input files discovered",
-        "---------------------",
-        f"{len(input_files)} input file(s) found under {input_dir}.",
+        f"include_input_files = {options.include_input_files}",
+        f"include_input_read_details = {options.include_input_read_details}",
     ]
-    lines.extend(f"- {_relative_path(path, input_dir)}" for path in input_files)
+    if options.include_input_files:
+        input_files = sorted(path for path in input_dir.rglob("*") if path.is_file())
+        lines.extend(
+            [
+                "",
+                "Input files discovered",
+                "---------------------",
+                f"{len(input_files)} input file(s) found under {input_dir}.",
+                *[f"- {_relative_path(path, input_dir)}" for path in input_files],
+            ]
+        )
 
+    if options.include_input_read_details:
+        lines.extend(["", *_input_read_lines(report)])
     lines.extend(
         [
-            "",
-            *_input_read_lines(report),
             "",
             *_value_read_lines(report),
             "",
@@ -169,7 +176,7 @@ def write_conversion_log(
                 "- write_lateral_bc_files: laterals -> dflowfm/lateral_*.bc (when present)",
                 "- write_cross_section_* : cross sections -> dflowfm/CrossSection*.ini (when active)",
                 "- write_structures: valid structures -> dflowfm/Structures.ini (when present)",
-                "- write_roughness: friction data -> dflowfm/roughness-Main.ini",
+                "- write_roughness: friction data -> dflowfm/roughness-Main.ini, dflowfm/roughness-FloodPlain1.ini, dflowfm/roughness-FloodPlain2.ini",
                 "- write_initial_*: initial conditions -> dflowfm/InitialWaterDepth.ini and initialFields.ini",
                 "- write_morphodynamics_files: morphology data -> dflowfm/mor.mor and related files (when active)",
                 "- copy/write RTC package: RTC data -> rtc/* (when active and available)",

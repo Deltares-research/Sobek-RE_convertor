@@ -10,6 +10,7 @@ def write_roughness(
     network: NetworkModel,
     roughness_by_branch: tuple[BranchRoughness, ...],
     target_path: Path,
+    friction_id: str = "Main",
 ) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -22,7 +23,7 @@ def write_roughness(
         "    fileType              = roughness",
         "",
         "[Global]",
-        "    frictionId            = #Main#",
+        f"    frictionId            = #{friction_id}#",
         "    frictionType          = Manning",
         "    frictionValue         = 0.030",
         "",
@@ -35,8 +36,17 @@ def write_roughness(
         friction_values = (0.03,)
         if roughness is not None and roughness.friction_type.lower() == "chezy":
             friction_type = "Chezy"
-            chainages = roughness.chainages
-            friction_values = roughness.values
+            profile_name = {
+                "Main": "Main channel",
+                "FloodPlain1": "Floodplain 1",
+                "FloodPlain2": "Floodplain 2",
+            }.get(friction_id, "Main channel")
+            profile = next(
+                (item for item in roughness.section_profiles if item[0] == profile_name),
+                (profile_name, roughness.chainages, roughness.values),
+            )
+            chainages = profile[1]
+            friction_values = profile[2]
 
         lines.extend(
             [

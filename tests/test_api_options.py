@@ -81,6 +81,34 @@ def test_convert_case_propagates_plot_flag(monkeypatch) -> None:
     assert captured["options"].create_plots is True
 
 
+def test_convert_case_propagates_input_file_log_flag(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_convert_network_case(input_dir: Path, output_dir: Path, options):
+        captured["options"] = options
+        return object()
+
+    monkeypatch.setattr(api, "convert_network_case", _fake_convert_network_case)
+
+    api.convert_case("in", "out", model_name="demo", include_input_files=True)
+
+    assert captured["options"].include_input_files is True
+
+
+def test_convert_case_propagates_input_read_details_flag(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_convert_network_case(input_dir: Path, output_dir: Path, options):
+        captured["options"] = options
+        return object()
+
+    monkeypatch.setattr(api, "convert_network_case", _fake_convert_network_case)
+
+    api.convert_case("in", "out", model_name="demo", include_input_read_details=True)
+
+    assert captured["options"].include_input_read_details is True
+
+
 def test_convert_case_propagates_morphodynamics_flag(monkeypatch) -> None:
     captured: dict[str, object] = {}
 

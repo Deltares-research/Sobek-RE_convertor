@@ -14,6 +14,8 @@ def convert_network(
     model_name: str = "sre2fm_network",
     test_duration_seconds: int = 7200,
     create_plots: bool = False,
+    include_input_files: bool = False,
+    include_input_read_details: bool = False,
 ) -> ConversionReport:
     """Convert only the SRE network into a minimal FM schematization."""
     options = ConversionOptions(
@@ -21,6 +23,8 @@ def convert_network(
         network_only=True,
         test_duration_seconds=test_duration_seconds,
         create_plots=create_plots,
+        include_input_files=include_input_files,
+        include_input_read_details=include_input_read_details,
     )
     return convert_network_case(Path(input_dir), Path(output_dir), options)
 
@@ -35,6 +39,8 @@ def convert_case(
     activate_rtc: bool = False,
     rtc_source_dir: str | Path | None = None,
     create_plots: bool = False,
+    include_input_files: bool = False,
+    include_input_read_details: bool = False,
 ) -> ConversionReport:
     """Convert an SRE case to a runnable FM schematization with supporting files."""
     options = ConversionOptions(
@@ -46,6 +52,8 @@ def convert_case(
         activate_morphodynamics=activate_morphodynamics,
         activate_rtc=activate_rtc,
         rtc_source_dir=Path(rtc_source_dir) if rtc_source_dir is not None else None,
+        include_input_files=include_input_files,
+        include_input_read_details=include_input_read_details,
     )
     return convert_network_case(Path(input_dir), Path(output_dir), options)
 

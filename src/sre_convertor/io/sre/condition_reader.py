@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from ...models import BoundaryCondition, LateralDischarge, NetworkModel, TimeSeriesPoint
@@ -55,7 +56,7 @@ def read_conditions(
 
         quantity = "dischargebnd"
         if series_record is not None:
-            if "h_" in series_record.attrs or series_record.attrs.get("ty") == "0":
+            if series_record.attrs.get("ty") == "0":
                 quantity = "waterlevelbnd"
 
         boundaries.append(
@@ -72,7 +73,7 @@ def read_conditions(
     laterals: list[LateralDischarge] = []
     for lateral_id, (branch_id, chainage, lateral_name) in sorted(lateral_locations.items()):
         series_record = lateral_series_records.get(lateral_id)
-        series = _parse_timeseries(series_record) if series_record is not None else tuple()
+        series = _parse_timeseries(series_record, duplicate_step_days=1) if series_record is not None else tuple()
 
         if not series:
             series = (
@@ -93,19 +94,34 @@ def read_conditions(
     return tuple(boundaries), tuple(laterals), warnings
 
 
-def _parse_timeseries(record: RawRecord | None) -> tuple[TimeSeriesPoint, ...]:
+def _parse_timeseries(
+    record: RawRecord | None,
+    duplicate_step_days: int = 0,
+) -> tuple[TimeSeriesPoint, ...]:
     if record is None or not record.tables:
         return tuple()
 
     rows = record.tables[0]
     series: list[TimeSeriesPoint] = []
+    previous_source_time = None
+    previous_time = None
     for row in rows:
         if len(row) < 2:
             continue
         value = _as_float(row[1])
         if value is None:
             continue
-        series.append(TimeSeriesPoint(time=row[0], value=value))
+        time = row[0]
+        if duplicate_step_days and time == previous_source_time and previous_time is not None:
+            try:
+                parsed_time = datetime.strptime(previous_time, "%Y/%m/%d;%H:%M:%S")
+            except ValueError:
+                pass
+            else:
+                time = (parsed_time + timedelta(days=duplicate_step_days)).strftime("%Y/%m/%d;%H:%M:%S")
+        series.append(TimeSeriesPoint(time=time, value=value))
+        previous_source_time = row[0]
+        previous_time = time
     return tuple(series)
 
 
