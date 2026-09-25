@@ -95,6 +95,7 @@ def test_convert_case_activates_laterals_structures_and_initial_fields(tmp_path:
     assert "IniFieldFile                      = fini.ini" in mdu
     assert "CrossLocFile                      = csl.ini" in mdu
     assert "CrossDefFile                      = csd.ini" in mdu
+    assert "FlowSolver                        = implicit1d" in mdu
 
     assert "[lateral]" in ext
     assert (dflowfm_dir / "fini.ini").exists()
