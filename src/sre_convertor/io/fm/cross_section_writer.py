@@ -23,7 +23,7 @@ def write_cross_section_definitions(
         lines.extend(
             [
                 "[Definition]",
-                f"   id = #{definition.id}#",
+                f"   id = {definition.id}",
                 "   type = zwRiver",
                 "   thalweg = 0.000000",
                 f"   numLevels = {float(len(definition.levels)):.6f}",
@@ -33,7 +33,7 @@ def write_cross_section_definitions(
                 f"   mainWidth = {main_width:.6f}",
                 f"   fp1Width = {definition.fp1_width:.6f}",
                 f"   fp2Width = {definition.fp2_width:.6f}",
-                "   frictionIds = #Main#;#FloodPlain1#;#FloodPlain2#",
+                "   frictionIds = Main;FloodPlain1;FloodPlain2",
                 "   isShared = 0.000000",
                 "",
             ]
@@ -61,11 +61,11 @@ def write_cross_section_locations(
         lines.extend(
             [
                 "[CrossSection]",
-                f"   id = #{location.id}#",
-                f"   branchId = #{branch_names.get(location.branch_id, location.branch_id)}#",
+                f"   id = {location.id}",
+                f"   branchId = {branch_names.get(location.branch_id, location.branch_id)}",
                 f"   chainage = {location.chainage:.6f}",
                 f"   shift = {location.reference_level:.6f}",
-                f"   definitionId = #{location.definition_id}#",
+                f"   definitionId = {location.definition_id}",
                 "",
             ]
         )
