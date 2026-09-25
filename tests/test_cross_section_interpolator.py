@@ -71,7 +71,7 @@ def test_densify_cross_sections_interpolates_between_known_profiles() -> None:
     assert middle_def.flow_widths == (3.0, 6.0)
 
 
-def test_densify_cross_sections_falls_back_when_shapes_differ() -> None:
+def test_densify_cross_sections_resamples_profiles_when_shapes_differ() -> None:
     network = _network_with_single_branch((0.0, 5.0, 10.0))
     definitions = (
         CrossSectionDefinition(
@@ -111,10 +111,9 @@ def test_densify_cross_sections_falls_back_when_shapes_differ() -> None:
     defs_out, locs_out, warnings = densify_cross_sections_for_grid(network, definitions, locations)
 
     assert len(locs_out) == 3
-    assert any("fallback" in warning for warning in warnings)
+    assert warnings == []
     middle = next(location for location in locs_out if abs(location.chainage - 5.0) < 1e-9)
-    # With unique definitions, middle location should map to a unique copy
-    assert middle.definition_id.startswith("CS_UNQ_")
-    # Ensure no definition is duplicated across locations
-    definition_ids = [loc.definition_id for loc in locs_out]
-    assert len(definition_ids) == len(set(definition_ids))
+    middle_def = next(definition for definition in defs_out if definition.id == middle.definition_id)
+    assert middle_def.levels == (0.0, 0.5, 1.0)
+    assert middle_def.flow_widths == (3.0, 4.5, 6.0)
+    assert middle_def.total_widths == (3.0, 4.5, 6.0)

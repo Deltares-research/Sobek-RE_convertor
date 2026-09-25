@@ -15,7 +15,8 @@ authors = [
 dependencies = [
   "hydrolib-core>=1.0.1",
   "xarray>=2024.1.0",
-  "netCDF4>=1.6.5"
+  "netCDF4>=1.6.5",
+  "matplotlib>=3.7.0"
 ]
 
 [project.optional-dependencies]
@@ -25,7 +26,10 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-addopts = "-q"
+addopts = "-q -m 'not integration'"
+markers = [
+  "integration: tests that convert the bundled full-size SRE case",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

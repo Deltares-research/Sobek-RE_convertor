@@ -138,6 +138,21 @@ report = convert_case(
 )
 ```
 
+Create inspection plots under `fig/`:
+
+```python
+from sre_convertor import convert_case
+
+report = convert_case(
+		input_dir="data/sre_simulation",
+		output_dir="build/fm_output",
+		model_name="converted_case",
+		create_plots=True,
+)
+```
+
+This creates one `fig/timeseries_<type>_<id>.png` file per time series, `fig/grid.png`, the aggregate `fig/initial_sediment_composition.png`, one `fig/initial_sediment_composition_branch_<id>.png` plot per branch, and one `fig/initial_condition_branch_<id>.png` plot per branch.
+
 Enable first-pass morphodynamics block in MDU (experimental):
 
 ```python

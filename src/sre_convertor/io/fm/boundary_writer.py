@@ -58,6 +58,7 @@ def write_external_forcing_file(
     laterals: tuple[LateralDischarge, ...],
     target_path: Path,
     data_path_prefix: str = "",
+    branch_names: dict[str, str] | None = None,
 ) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -71,6 +72,8 @@ def write_external_forcing_file(
     prefix = data_path_prefix.strip()
     if prefix and not prefix.endswith("/"):
         prefix = f"{prefix}/"
+
+    branch_names = branch_names or {}
 
     for boundary in boundaries:
         lines.extend(
@@ -87,10 +90,10 @@ def write_external_forcing_file(
         lines.extend(
             [
                 "[lateral]",
-                f"id                    = {lateral.id}",
-                f"branchid              = {lateral.branch_id}",
+                f"id                    = {lateral.name}",
+                f"branchid              = {branch_names.get(lateral.branch_id, lateral.branch_id)}",
                 f"chainage              = {lateral.chainage:.3f}",
-                f"discharge             = {prefix}{lateral.id}.bc",
+                f"discharge             = {prefix}{lateral.name}.bc",
                 "",
             ]
         )
@@ -108,14 +111,14 @@ def write_lateral_bc_files(
 
     ref = runtime.refdate.strftime("%Y-%m-%d 00:00:00")
     for lateral in laterals:
-        path = target_dir / f"{lateral.id}.bc"
+        path = target_dir / f"{lateral.name}.bc"
         lines: list[str] = [
             "[General]",
             "    fileVersion           = 1.01",
             "    fileType              = boundConds",
             "",
             "[forcing]",
-            f"    name                  = {lateral.id}",
+            f"    name                  = {lateral.name}",
             "    function              = timeseries",
             "    time-interpolation    = linear",
             "    quantity              = time",

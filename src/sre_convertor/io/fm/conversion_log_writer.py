@@ -19,6 +19,75 @@ _READ_STAGES = (
 )
 
 
+def _relative_path(path: Path, root: Path) -> str:
+    return path.relative_to(root).as_posix()
+
+
+def _network_read_lines(report: ConversionReport) -> list[str]:
+    diagnostics = report.network_diagnostics
+    lines = ["Network input read details", "--------------------------"]
+    lines.append(f"DEFTOP source records: {len(diagnostics.topology_node_lines) + len(diagnostics.topology_branch_lines)}")
+    lines.extend(f"- DEFTOP line {line}: NODE {node_id}" for node_id, line in diagnostics.topology_node_lines)
+    lines.extend(f"- DEFTOP line {line}: BRCH {branch_id}" for branch_id, line in diagnostics.topology_branch_lines)
+
+    grid_points = 0
+    grid_edges = 0
+    branch_by_id = {
+        branch_id: (from_node_id, to_node_id, length, chainages)
+        for branch_id, from_node_id, to_node_id, length, chainages in diagnostics.branch_connectivity
+    }
+    for filename, start, end, branch_id, chainages in diagnostics.grid_records:
+        branch = branch_by_id.get(branch_id)
+        point_count = len(chainages)
+        if branch is not None:
+            point_count = len(_grid_offsets(chainages, branch[2]))
+        grid_points += point_count
+        grid_edges += max(point_count - 1, 0)
+        lines.append(
+            f"- {filename} lines {start}-{end}: GRID branch {branch_id}; "
+            f"chainages={', '.join(_format_number(value) for value in chainages)}; "
+            f"grid points={point_count}; grid edges={max(point_count - 1, 0)}"
+        )
+    lines.append(f"Source network nodes: {len(diagnostics.topology_node_lines)}")
+    lines.append(f"Generated grid points: {grid_points}")
+    lines.append(f"Generated grid edges: {grid_edges}")
+    lines.append("Grid connectivity:")
+    for branch_id, from_node_id, to_node_id, length, chainages in diagnostics.branch_connectivity:
+        point_count = len(_grid_offsets(chainages, length))
+        lines.append(
+            f"- branch {branch_id}: {from_node_id} -> {to_node_id}; "
+            f"points={point_count}; edges={max(point_count - 1, 0)}"
+        )
+    return lines
+
+
+def _input_read_lines(report: ConversionReport) -> list[str]:
+    lines = ["All input file read details", "---------------------------"]
+    for diagnostic in report.input_diagnostics:
+        relative_path = diagnostic.source_file.as_posix()
+        lines.append(f"- {relative_path}: read {diagnostic.line_count} line(s)")
+        for key, start, end in diagnostic.records:
+            lines.append(f"  - {relative_path} lines {start}-{end}: read {key} record")
+    return lines
+
+
+def _value_read_lines(report: ConversionReport) -> list[str]:
+    return ["Parsed values read", "------------------", *[f"- {detail}" for detail in report.value_read_details]]
+
+
+def _format_number(value: float) -> str:
+    return f"{value:g}"
+
+
+def _grid_offsets(chainages: tuple[float, ...], branch_length: float) -> tuple[float, ...]:
+    offsets = [value for value in chainages if 0.0 <= value <= branch_length]
+    if not offsets or offsets[0] != 0.0:
+        offsets.insert(0, 0.0)
+    if offsets[-1] != branch_length:
+        offsets.append(branch_length)
+    return tuple(sorted(set(offsets)))
+
+
 def write_conversion_log(
     output_path: Path,
     input_dir: Path,
@@ -45,6 +114,7 @@ def write_conversion_log(
         f"network_only = {options.network_only}",
         f"activate_cross_sections = {options.activate_cross_sections}",
         f"test_duration_seconds = {options.test_duration_seconds}",
+        f"create_plots = {options.create_plots}",
         f"activate_morphodynamics = {options.activate_morphodynamics}",
         f"activate_rtc = {options.activate_rtc}",
         f"rtc_source_dir = {options.rtc_source_dir}",
@@ -53,10 +123,16 @@ def write_conversion_log(
         "---------------------",
         f"{len(input_files)} input file(s) found under {input_dir}.",
     ]
-    lines.extend(f"- {path.relative_to(input_dir)}" for path in input_files)
+    lines.extend(f"- {_relative_path(path, input_dir)}" for path in input_files)
 
     lines.extend(
         [
+            "",
+            *_input_read_lines(report),
+            "",
+            *_value_read_lines(report),
+            "",
+            *_network_read_lines(report),
             "",
             "Conversion stages",
             "-----------------",
@@ -96,7 +172,7 @@ def write_conversion_log(
             f"{len(output_files)} output file(s) created by the conversion.",
         ]
     )
-    lines.extend(f"- {path.relative_to(report.output_dir)}" for path in output_files)
+    lines.extend(f"- {_relative_path(path, report.output_dir)}" for path in output_files)
 
     lines.extend(
         [

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ...models import BranchRoughness, NetworkModel
+from .names import branch_names
 
 
 def write_roughness(
@@ -13,6 +14,7 @@ def write_roughness(
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
     source_roughness = {item.branch_id: item for item in roughness_by_branch}
+    display_names = branch_names(network)
 
     lines: list[str] = [
         "[General]",
@@ -37,7 +39,7 @@ def write_roughness(
         lines.extend(
             [
                 "[Branch]",
-                f"    branchId              = #{branch.id}#",
+                f"    branchId              = #{display_names[branch.id]}#",
                 f"    frictionType          = {friction_type}",
                 "    functionType          = constant",
                 "    numLocations          = 1",

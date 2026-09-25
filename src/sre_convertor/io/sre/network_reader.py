@@ -3,7 +3,7 @@ from __future__ import annotations
 import shlex
 from pathlib import Path
 
-from ...models import Branch, NetworkModel, Node
+from ...models import Branch, NetworkModel, NetworkReadDiagnostics, Node
 from .records import load_records
 
 class SreParseError(ValueError):
@@ -50,8 +50,13 @@ def read_sre_network(input_dir: Path) -> NetworkModel:
     source_file = _find_topology_file(input_dir)
     nodes: list[Node] = []
     branches: list[Branch] = []
+    node_lines: list[tuple[str, int]] = []
+    branch_lines: list[tuple[str, int]] = []
 
-    for line in source_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+    for line_number, line in enumerate(
+        source_file.read_text(encoding="utf-8", errors="ignore").splitlines(),
+        start=1,
+    ):
         stripped = line.strip()
         if not stripped:
             continue
@@ -59,14 +64,11 @@ def read_sre_network(input_dir: Path) -> NetworkModel:
         if stripped.startswith("NODE "):
             attrs = _parse_key_values(stripped)
             try:
+                node_id = attrs["id"]
                 nodes.append(
-                    Node(
-                        id=attrs["id"],
-                        name=attrs.get("nm", ""),
-                        x=float(attrs["px"]),
-                        y=float(attrs["py"]),
-                    )
+                    Node(id=node_id, name=attrs.get("nm", ""), x=float(attrs["px"]), y=float(attrs["py"])),
                 )
+                node_lines.append((node_id, line_number))
             except KeyError as e:
                 raise SreParseError(f"Missing NODE field {e!s} in line: {stripped}") from e
             except ValueError as e:
@@ -76,15 +78,17 @@ def read_sre_network(input_dir: Path) -> NetworkModel:
         if stripped.startswith("BRCH "):
             attrs = _parse_key_values(stripped)
             try:
+                branch_id = attrs["id"]
                 branches.append(
                     Branch(
-                        id=attrs["id"],
+                        id=branch_id,
                         name=attrs.get("nm", ""),
                         from_node_id=attrs["bn"],
                         to_node_id=attrs["en"],
                         length=float(attrs["al"]),
                     )
                 )
+                branch_lines.append((branch_id, line_number))
             except KeyError as e:
                 raise SreParseError(f"Missing BRCH field {e!s} in line: {stripped}") from e
             except ValueError as e:
@@ -95,7 +99,7 @@ def read_sre_network(input_dir: Path) -> NetworkModel:
     if not branches:
         raise SreParseError(f"No BRCH records found in {source_file.name}.")
 
-    branch_grid_chainages = _read_branch_grid_chainages(input_dir)
+    branch_grid_chainages, grid_records = _read_branch_grid_chainages(input_dir)
     branches = [
         Branch(
             id=branch.id,
@@ -108,12 +112,28 @@ def read_sre_network(input_dir: Path) -> NetworkModel:
         for branch in branches
     ]
 
-    return NetworkModel(nodes=tuple(nodes), branches=tuple(branches), source_file=source_file)
+    return NetworkModel(
+        nodes=tuple(nodes),
+        branches=tuple(branches),
+        source_file=source_file,
+        diagnostics=NetworkReadDiagnostics(
+            topology_node_lines=tuple(node_lines),
+            topology_branch_lines=tuple(branch_lines),
+            grid_records=tuple(grid_records),
+            branch_connectivity=tuple(
+                (branch.id, branch.from_node_id, branch.to_node_id, branch.length, branch.grid_chainages)
+                for branch in branches
+            ),
+        ),
+    )
 
 
-def _read_branch_grid_chainages(input_dir: Path) -> dict[str, tuple[float, ...]]:
+def _read_branch_grid_chainages(
+    input_dir: Path,
+) -> tuple[dict[str, tuple[float, ...]], list[tuple[str, int, int, str, tuple[float, ...]]]]:
     records = load_records(input_dir, "DEFGRD", {"GRID"})
     chainages_by_branch: dict[str, tuple[float, ...]] = {}
+    grid_records: list[tuple[str, int, int, str, tuple[float, ...]]] = []
 
     for record in records:
         branch_id = record.attrs.get("ci")
@@ -131,9 +151,19 @@ def _read_branch_grid_chainages(input_dir: Path) -> dict[str, tuple[float, ...]]
                     continue
 
         if values:
-            chainages_by_branch[branch_id] = _normalize_chainages(values)
+            chainages = _normalize_chainages(values)
+            chainages_by_branch[branch_id] = chainages
+            grid_records.append(
+                (
+                    record.source_file.name,
+                    record.source_line_start,
+                    record.source_line_end,
+                    branch_id,
+                    chainages,
+                )
+            )
 
-    return chainages_by_branch
+    return chainages_by_branch, grid_records
 
 
 def _normalize_chainages(values: list[float]) -> tuple[float, ...]:

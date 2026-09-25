@@ -162,9 +162,8 @@ def _compatible_for_interpolation(
     right: CrossSectionDefinition,
 ) -> bool:
     return (
-        len(left.levels) == len(right.levels)
-        and len(left.flow_widths) == len(right.flow_widths)
-        and len(left.total_widths) == len(right.total_widths)
+        _definition_shape_is_valid(left)
+        and _definition_shape_is_valid(right)
     )
 
 
@@ -174,17 +173,51 @@ def _interpolate_definition(
     right: CrossSectionDefinition,
     ratio: float,
 ) -> CrossSectionDefinition:
+    target_count = max(len(left.levels), len(right.levels))
+    left_levels = _resample_series(left.levels, target_count)
+    right_levels = _resample_series(right.levels, target_count)
+    left_flow_widths = _resample_series(left.flow_widths, target_count)
+    right_flow_widths = _resample_series(right.flow_widths, target_count)
+    left_total_widths = _resample_series(left.total_widths, target_count)
+    right_total_widths = _resample_series(right.total_widths, target_count)
+
     return CrossSectionDefinition(
         id=definition_id,
         name=definition_id,
-        levels=_interpolate_series(left.levels, right.levels, ratio),
-        flow_widths=_interpolate_series(left.flow_widths, right.flow_widths, ratio),
-        total_widths=_interpolate_series(left.total_widths, right.total_widths, ratio),
+        levels=_interpolate_series(left_levels, right_levels, ratio),
+        flow_widths=_interpolate_series(left_flow_widths, right_flow_widths, ratio),
+        total_widths=_interpolate_series(left_total_widths, right_total_widths, ratio),
     )
 
 
 def _interpolate_series(left: tuple[float, ...], right: tuple[float, ...], ratio: float) -> tuple[float, ...]:
     return tuple(_interpolate_value(lv, rv, ratio) for lv, rv in zip(left, right))
+
+
+def _definition_shape_is_valid(definition: CrossSectionDefinition) -> bool:
+    count = len(definition.levels)
+    return (
+        count >= 1
+        and len(definition.flow_widths) == count
+        and len(definition.total_widths) == count
+    )
+
+
+def _resample_series(values: tuple[float, ...], target_count: int) -> tuple[float, ...]:
+    if len(values) == target_count:
+        return values
+    if len(values) == 1:
+        return (values[0],) * target_count
+
+    source_scale = (len(values) - 1) / (target_count - 1)
+    resampled: list[float] = []
+    for target_index in range(target_count):
+        source_position = target_index * source_scale
+        lower_index = int(source_position)
+        upper_index = min(lower_index + 1, len(values) - 1)
+        fraction = source_position - lower_index
+        resampled.append(_interpolate_value(values[lower_index], values[upper_index], fraction))
+    return tuple(resampled)
 
 
 def _interpolate_value(left: float, right: float, ratio: float) -> float:

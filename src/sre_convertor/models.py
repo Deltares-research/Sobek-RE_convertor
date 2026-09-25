@@ -24,10 +24,26 @@ class Branch:
 
 
 @dataclass(frozen=True)
+class NetworkReadDiagnostics:
+    topology_node_lines: tuple[tuple[str, int], ...] = ()
+    topology_branch_lines: tuple[tuple[str, int], ...] = ()
+    grid_records: tuple[tuple[str, int, int, str, tuple[float, ...]], ...] = ()
+    branch_connectivity: tuple[tuple[str, str, str, float, tuple[float, ...]], ...] = ()
+
+
+@dataclass(frozen=True)
+class InputReadDiagnostic:
+    source_file: Path
+    line_count: int
+    records: tuple[tuple[str, int, int], ...] = ()
+
+
+@dataclass(frozen=True)
 class NetworkModel:
     nodes: tuple[Node, ...]
     branches: tuple[Branch, ...]
     source_file: Path
+    diagnostics: NetworkReadDiagnostics = NetworkReadDiagnostics()
 
 
 @dataclass(frozen=True)
@@ -196,6 +212,7 @@ class ConversionOptions:
     activate_morphodynamics: bool = False
     activate_rtc: bool = False
     rtc_source_dir: Path | None = None
+    create_plots: bool = False
 
 
 @dataclass
@@ -207,3 +224,6 @@ class ConversionReport:
     branches_count: int
     files_created: list[Path] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    network_diagnostics: NetworkReadDiagnostics = field(default_factory=NetworkReadDiagnostics)
+    input_diagnostics: tuple[InputReadDiagnostic, ...] = ()
+    value_read_details: tuple[str, ...] = ()

@@ -23,6 +23,8 @@ def test_read_sre_network_from_deftop(tmp_path: Path) -> None:
     assert network.nodes[0].id == "n1"
     assert network.branches[0].from_node_id == "n1"
     assert network.branches[0].to_node_id == "n2"
+    assert network.diagnostics.topology_node_lines == (("n1", 1), ("n2", 2))
+    assert network.diagnostics.topology_branch_lines == (("b1", 3),)
 
 
 def test_read_sre_network_reads_defgrd_chainages(tmp_path: Path) -> None:
@@ -52,3 +54,4 @@ def test_read_sre_network_reads_defgrd_chainages(tmp_path: Path) -> None:
     network = read_sre_network(tmp_path)
 
     assert network.branches[0].grid_chainages == (0.0, 2.0, 5.0, 10.0)
+    assert network.diagnostics.grid_records == (("DEFGRD.1", 1, 5, "b1", (0.0, 2.0, 5.0, 10.0)),)

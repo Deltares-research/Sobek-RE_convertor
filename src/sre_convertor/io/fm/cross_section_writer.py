@@ -44,6 +44,7 @@ def write_cross_section_definitions(
 def write_cross_section_locations(
     locations: tuple[CrossSectionLocation, ...],
     target_path: Path,
+    branch_names: dict[str, str] | None = None,
 ) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -54,12 +55,13 @@ def write_cross_section_locations(
         "",
     ]
 
+    branch_names = branch_names or {}
     for location in locations:
         lines.extend(
             [
                 "[CrossSection]",
                 f"   id = #{location.id}#",
-                f"   branchId = #{location.branch_id}#",
+                f"   branchId = #{branch_names.get(location.branch_id, location.branch_id)}#",
                 f"   chainage = {location.chainage:.6f}",
                 f"   shift = {location.reference_level:.6f}",
                 f"   definitionId = #{location.definition_id}#",

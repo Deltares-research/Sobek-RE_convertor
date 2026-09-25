@@ -67,6 +67,20 @@ def test_convert_case_propagates_test_duration(monkeypatch) -> None:
     assert options.test_duration_seconds == 900
 
 
+def test_convert_case_propagates_plot_flag(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_convert_network_case(input_dir: Path, output_dir: Path, options):
+        captured["options"] = options
+        return object()
+
+    monkeypatch.setattr(api, "convert_network_case", _fake_convert_network_case)
+
+    api.convert_case("in", "out", model_name="demo", create_plots=True)
+
+    assert captured["options"].create_plots is True
+
+
 def test_convert_case_propagates_morphodynamics_flag(monkeypatch) -> None:
     captured: dict[str, object] = {}
 

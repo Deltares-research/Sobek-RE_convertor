@@ -5,7 +5,11 @@ from pathlib import Path
 from ...models import Structure
 
 
-def write_structures(structures: tuple[Structure, ...], target_path: Path) -> None:
+def write_structures(
+    structures: tuple[Structure, ...],
+    target_path: Path,
+    branch_names: dict[str, str] | None = None,
+) -> None:
     target_path.parent.mkdir(parents=True, exist_ok=True)
 
     lines: list[str] = [
@@ -15,12 +19,13 @@ def write_structures(structures: tuple[Structure, ...], target_path: Path) -> No
         "",
     ]
 
+    branch_names = branch_names or {}
     for structure in structures:
         lines.extend(
             [
                 "[Structure]",
-                f"    id                    = {structure.id}",
-                f"    branchId              = {structure.branch_id}",
+                f"    id                    = {structure.name}",
+                f"    branchId              = {branch_names.get(structure.branch_id, structure.branch_id)}",
                 f"    chainage              = {structure.chainage:.3f}",
                 f"    type                  = {structure.structure_type}",
                 f"    crestLevel            = {structure.crest_level:.3f}",

@@ -12,6 +12,7 @@ from .io.fm.cross_section_writer import (
     write_cross_section_locations,
 )
 from .io.fm.cross_section_interpolator import densify_cross_sections_for_grid
+from .io.fm.conversion_log_writer import write_conversion_log
 from .io.fm.dimr_writer import write_dimr_config
 from .io.fm.initial_field_writer import (
     write_initial_water_depth,
@@ -20,6 +21,8 @@ from .io.fm.initial_field_writer import (
 from .io.fm.mdu_writer import write_mdu
 from .io.fm.morphodynamics_writer import write_morphodynamics_files
 from .io.fm.net_writer import write_network_netcdf
+from .io.fm.names import branch_names
+from .io.fm.plot_writer import write_conversion_plots
 from .io.fm.roughness_writer import write_roughness
 from .io.fm.run_writer import write_run_dimr_bat
 from .io.fm.rtc_writer import RtcCoupling, copy_rtc_package, write_native_rtc_package, write_sre_rtc_inventory
@@ -28,6 +31,8 @@ from .io.sre.condition_reader import read_conditions
 from .io.sre.cross_section_reader import read_cross_sections
 from .io.sre.friction_reader import read_friction
 from .io.sre.initial_conditions_reader import read_initial_conditions
+from .io.sre.input_diagnostics import collect_input_diagnostics
+from .io.sre.value_diagnostics import collect_value_read_details
 from .io.sre.morphodynamics_reader import read_morphodynamics_summary
 from .io.sre.network_reader import read_sre_network
 from .io.sre.runtime_reader import read_runtime_settings
@@ -112,6 +117,7 @@ def convert_network_case(
         write_cross_section_locations(
             cross_locs_fm,
             dflowfm_dir / cross_loc_name,
+            branch_names=branch_names(case_model.network),
         )
         created_files.extend([dflowfm_dir / cross_def_name, dflowfm_dir / cross_loc_name])
 
@@ -129,6 +135,7 @@ def convert_network_case(
         case_model.laterals,
         dflowfm_dir / ext_filename,
         data_path_prefix="",
+        branch_names=branch_names(case_model.network),
     )
     created_files.append(dflowfm_dir / ext_filename)
 
@@ -144,7 +151,11 @@ def convert_network_case(
 
     if valid_structures:
         structure_file_name = "Structures.ini"
-        write_structures(valid_structures, dflowfm_dir / structure_file_name)
+        write_structures(
+            valid_structures,
+            dflowfm_dir / structure_file_name,
+            branch_names=branch_names(case_model.network),
+        )
         created_files.append(dflowfm_dir / structure_file_name)
 
     roughness_file_name = "roughness-Main.ini"
@@ -196,6 +207,7 @@ def convert_network_case(
                     output_dir / "rtc",
                     case_model.rtc,
                     case_model.runtime,
+                    branch_names=branch_names(case_model.network),
                 )
                 created_files.extend(path for path in rtc_dir.rglob("*") if path.is_file())
                 if observation_path is not None:
@@ -236,7 +248,7 @@ def convert_network_case(
 
     created_files.append(write_run_dimr_bat(output_dir))
 
-    return ConversionReport(
+    report = ConversionReport(
         input_dir=input_dir,
         output_dir=output_dir,
         model_name=options.model_name,
@@ -244,7 +256,33 @@ def convert_network_case(
         branches_count=len(case_model.network.branches),
         files_created=created_files,
         warnings=warnings,
+        network_diagnostics=case_model.network.diagnostics,
+        input_diagnostics=collect_input_diagnostics(input_dir),
+        value_read_details=collect_value_read_details(input_dir, case_model),
     )
+    if options.create_plots:
+        report.files_created.extend(
+            write_conversion_plots(
+                output_dir / "fig",
+                case_model.network,
+                boundaries=case_model.boundaries,
+                laterals=case_model.laterals,
+                sediment_fractions=case_model.morphodynamics.sediment_fractions_d50_m,
+                branch_composition=case_model.morphodynamics.branch_composition,
+                layer_composition=case_model.morphodynamics.layer_composition,
+                layer_count=case_model.morphodynamics.underlayer_count,
+                initial_conditions=case_model.initial_conditions,
+            )
+        )
+    log_path = write_conversion_log(
+        output_dir / "conversion.log",
+        input_dir,
+        options,
+        report,
+        network_only=False,
+    )
+    report.files_created.append(log_path)
+    return report
 
 
 def _convert_network_only(
@@ -280,7 +318,7 @@ def _convert_network_only(
     )
     write_dimr_config(output_dir / "dimr_config.xml", mdu_filename)
 
-    return ConversionReport(
+    report = ConversionReport(
         input_dir=input_dir,
         output_dir=output_dir,
         model_name=options.model_name,
@@ -288,7 +326,20 @@ def _convert_network_only(
         branches_count=len(network.branches),
         files_created=[dflowfm_dir / net_filename, dflowfm_dir / mdu_filename, output_dir / "dimr_config.xml"],
         warnings=warnings,
+        network_diagnostics=network.diagnostics,
+        input_diagnostics=collect_input_diagnostics(input_dir),
     )
+    if options.create_plots:
+        report.files_created.extend(write_conversion_plots(output_dir / "fig", network))
+    log_path = write_conversion_log(
+        output_dir / "conversion.log",
+        input_dir,
+        options,
+        report,
+        network_only=True,
+    )
+    report.files_created.append(log_path)
+    return report
 
 
 def _read_sre_case(input_dir: Path, options: ConversionOptions) -> tuple[SreCaseModel, list[str]]:
@@ -369,13 +420,13 @@ def _map_boundaries_to_fm_node_ids(
             )
             continue
 
-        fm_node_id = _format_fm_network_node_id(node.x, node.y)
+        fm_node_id = node.name or node.id
         mapped.append(
             BoundaryCondition(
                 id=boundary.id,
                 name=boundary.name,
                 node_id=fm_node_id,
-                node_name=fm_node_id,
+                node_name=node.name or node.id,
                 quantity=boundary.quantity,
                 series=boundary.series,
             )

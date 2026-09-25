@@ -73,6 +73,7 @@ def write_native_rtc_package(
     target_dir: Path,
     summary: SreRtcSummary,
     runtime: RuntimeSettings,
+    branch_names: dict[str, str] | None = None,
 ) -> tuple[Path, RtcCoupling, Path | None, list[str]]:
     if target_dir.exists():
         shutil.rmtree(target_dir)
@@ -82,7 +83,11 @@ def write_native_rtc_package(
     observation_names = _rtc_observation_names(summary)
     observation_path = None
     if observation_names:
-        observation_path = write_rtc_observation_points(target_dir.parent / "dflowfm" / "ObservationPoints_rtc.ini", observation_names)
+        observation_path = write_rtc_observation_points(
+            target_dir.parent / "dflowfm" / "ObservationPoints_rtc.ini",
+            observation_names,
+            branch_names=branch_names,
+        )
 
     (target_dir / "settings.json").write_text('{\n  "xmlDir": ".",\n  "schemaDir": "."\n}\n', encoding="utf-8")
     _copy_rtc_schema_files(target_dir, warnings)
@@ -97,15 +102,20 @@ def write_native_rtc_package(
     return target_dir, coupling, observation_path, warnings
 
 
-def write_rtc_observation_points(target_path: Path, observation_names: dict[tuple[str, float], str]) -> Path:
+def write_rtc_observation_points(
+    target_path: Path,
+    observation_names: dict[tuple[str, float], str],
+    branch_names: dict[str, str] | None = None,
+) -> Path:
     target_path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["[General]", "    fileVersion           = 2.00", "    fileType              = obsPoint", ""]
+    branch_names = branch_names or {}
     for (branch_id, chainage), name in sorted(observation_names.items(), key=lambda item: item[1]):
         lines.extend(
             [
                 "[ObservationPoint]",
                 f"    name      = {name}",
-                f"    branchId  = {branch_id}",
+                f"    branchId  = {branch_names.get(branch_id, branch_id)}",
                 f"    chainage  = {chainage:.3f}",
                 "",
             ]

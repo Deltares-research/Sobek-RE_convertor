@@ -11,6 +11,8 @@ class RawRecord:
     attrs: dict[str, str]
     tables: tuple[tuple[tuple[str, ...], ...], ...]
     source_file: Path
+    source_line_start: int
+    source_line_end: int
 
 
 def normalize_value(value: str) -> str:
@@ -34,10 +36,11 @@ def load_records(input_dir: Path, stem: str, keys: set[str]) -> list[RawRecord]:
 
 
 def _parse_file_records(lines: list[str], source_file: Path, keys: set[str]) -> list[RawRecord]:
-    grouped_lines: list[list[str]] = []
+    grouped_lines: list[tuple[list[str], int, int]] = []
     current: list[str] = []
+    current_start = 0
 
-    for line in lines:
+    for line_number, line in enumerate(lines, start=1):
         stripped = line.strip()
         if not stripped:
             continue
@@ -45,18 +48,19 @@ def _parse_file_records(lines: list[str], source_file: Path, keys: set[str]) -> 
         token = stripped.split(maxsplit=1)[0].upper()
         if token in keys:
             if current:
-                grouped_lines.append(current)
+                grouped_lines.append((current, current_start, line_number - 1))
             current = [stripped]
+            current_start = line_number
         elif current:
             current.append(stripped)
 
     if current:
-        grouped_lines.append(current)
+        grouped_lines.append((current, current_start, len(lines)))
 
-    return [_parse_record(chunk, source_file) for chunk in grouped_lines]
+    return [_parse_record(chunk, source_file, start, end) for chunk, start, end in grouped_lines]
 
 
-def _parse_record(lines: list[str], source_file: Path) -> RawRecord:
+def _parse_record(lines: list[str], source_file: Path, source_line_start: int, source_line_end: int) -> RawRecord:
     first_tokens = _split_tokens(lines[0])
     key = first_tokens[0].upper()
 
@@ -104,7 +108,14 @@ def _parse_record(lines: list[str], source_file: Path) -> RawRecord:
     if current_table is not None:
         tables.append(tuple(current_table))
 
-    return RawRecord(key=key, attrs=attrs, tables=tuple(tables), source_file=source_file)
+    return RawRecord(
+        key=key,
+        attrs=attrs,
+        tables=tuple(tables),
+        source_file=source_file,
+        source_line_start=source_line_start,
+        source_line_end=source_line_end,
+    )
 
 
 def _split_tokens(line: str) -> list[str]:
