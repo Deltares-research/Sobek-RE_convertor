@@ -163,7 +163,7 @@ def write_conversion_log(
     )
     if network_only:
         lines.append("- read_sre_network: DEFTOP.1 and DEFGRD.* -> network model")
-        lines.append("- write_network_netcdf: network model -> dflowfm/<model>_net.nc")
+        lines.append("- write_network_netcdf: network model -> dflowfm/grd_net.nc")
         lines.append("- write_mdu: network model -> dflowfm/<model>.mdu")
         lines.append("- write_dimr_config: model configuration -> dimr_config.xml")
     else:
@@ -171,12 +171,12 @@ def write_conversion_log(
             lines.append(f"- {name}: {inputs} -> {result}")
         lines.extend(
             [
-                "- write_network_netcdf: network model -> dflowfm/<model>_net.nc",
-                "- write_boundary_conditions: boundaries -> dflowfm/BoundaryConditions.bc",
-                "- write_external_forcing_file: boundaries/laterals -> dflowfm/<model>.ext",
+                "- write_network_netcdf: network model -> dflowfm/grd_net.nc",
+                "- write_boundary_conditions: boundaries -> dflowfm/bc.bc",
+                "- write_external_forcing_file: boundaries/laterals -> dflowfm/ext.ext",
                 "- write_lateral_bc_files: laterals -> dflowfm/lateral_*.bc (when present)",
-                "- write_cross_section_* : cross sections -> dflowfm/CrossSection*.ini (when active)",
-                "- write_structures: valid structures -> dflowfm/Structures.ini (when present)",
+                "- write_cross_section_* : cross sections -> dflowfm/csd.ini and dflowfm/csl.ini (when active)",
+                "- write_structures: valid structures -> dflowfm/struct.ini (when present)",
                 "- write_roughness: friction data -> dflowfm/roughness-Main.ini, dflowfm/roughness-FloodPlain1.ini, dflowfm/roughness-FloodPlain2.ini",
             ]
         )
@@ -184,7 +184,7 @@ def write_conversion_log(
             lines.extend(["", morphodynamics_conversion_details])
         lines.extend(
             [
-                "- write_initial_*: initial conditions -> dflowfm/InitialWaterDepth.ini and initialFields.ini",
+                "- write_initial_*: initial conditions -> dflowfm/fini_h.ini and fini.ini",
                 "- write_morphodynamics_files: morphology data -> dflowfm/mor.mor and related files (when active)",
                 "- copy/write RTC package: RTC data -> rtc/* (when active and available)",
                 "- write_mdu: converted model settings -> dflowfm/<model>.mdu",

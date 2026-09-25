@@ -45,17 +45,42 @@ def collect_value_read_details(input_dir: Path, case: SreCaseModel) -> tuple[str
         )
 
     for boundary in case.boundaries:
-        record = _find_record(records, "FLBO", boundary.id)
-        details.append(_series_detail("boundary", boundary.id, boundary.name, boundary.series, record, f"node={boundary.node_id!r} quantity={boundary.quantity}"))
+        record = _find_series_record(records, {"FLBO"}, boundary.id)
+        details.append(
+            _series_detail(
+                "boundary",
+                boundary.id,
+                boundary.name,
+                boundary.series,
+                record,
+                (
+                    f"node={boundary.node_id!r}",
+                    f"node_name={boundary.node_name!r}",
+                    f"quantity={boundary.quantity}",
+                ),
+            )
+        )
     for lateral in case.laterals:
-        record = _find_record(records, "FLBR", lateral.id) or _find_record(records, "FLBX", lateral.id)
-        details.append(_series_detail("lateral", lateral.id, lateral.name, lateral.series, record, f"branch={lateral.branch_id!r} chainage={lateral.chainage:g}"))
+        record = _find_series_record(records, {"FLBR"}, lateral.id) or _find_series_record(records, {"FLBX"}, lateral.id)
+        details.append(
+            _series_detail(
+                "lateral",
+                lateral.id,
+                lateral.name,
+                lateral.series,
+                record,
+                (f"branch={lateral.branch_id!r}", f"chainage={lateral.chainage:g}"),
+            )
+        )
 
     for roughness in case.roughness:
         record = _find_record(records, "BDFR", roughness.branch_id, attribute="ci")
-        details.append(
-            f"roughness branch={roughness.branch_id!r} type={roughness.friction_type!r} value={roughness.value:g} {_source(record)}"
-        )
+        for section_name, chainages, values in roughness.section_profiles:
+            for chainage, value in zip(chainages, values):
+                details.append(
+                    f"roughness branch={roughness.branch_id!r} section={section_name!r} "
+                    f"type={roughness.friction_type!r} chainage={chainage:g} value={value:g} {_source(record)}"
+                )
     for initial in case.initial_conditions:
         record = _find_record(records, "FLIN", initial.branch_id, attribute="ci")
         details.append(
@@ -109,6 +134,17 @@ def _find_record(records: list[RawRecord], key: str, value: str, attribute: str 
     return next((record for record in records if record.key == key and record.attrs.get(attribute) == value), None)
 
 
+def _find_series_record(records: list[RawRecord], keys: set[str], value: str) -> RawRecord | None:
+    return next(
+        (
+            record
+            for record in records
+            if record.key in keys and record.attrs.get("id") == value and record.tables
+        ),
+        None,
+    )
+
+
 def _first_record(records: list[RawRecord], *keys: str) -> RawRecord | None:
     return next((record for record in records if record.key in keys), None)
 
@@ -123,7 +159,14 @@ def _values(values: tuple[float, ...]) -> str:
     return "[" + ", ".join(f"{value:g}" for value in values) + "]"
 
 
-def _series_detail(kind: str, identifier: str, name: str, series: tuple, record: RawRecord | None, location: str) -> str:
+def _series_detail(
+    kind: str,
+    identifier: str,
+    name: str,
+    series: tuple,
+    record: RawRecord | None,
+    location_fields: tuple[str, ...],
+) -> str:
     if series:
         time_start = series[0].time
         time_end = series[-1].time
@@ -135,4 +178,11 @@ def _series_detail(kind: str, identifier: str, name: str, series: tuple, record:
         )
     else:
         summary = "time_start=empty time_end=empty minimum=empty maximum=empty"
-    return f"{kind} id={identifier!r} name={name!r} {location} {summary} {_source(record)}"
+    fields = (
+        f"id={identifier!r}",
+        f"name={name!r}",
+        *location_fields,
+        *summary.split(),
+        _source(record),
+    )
+    return "\n".join([kind.capitalize(), *(f"  {field}" for field in fields)])

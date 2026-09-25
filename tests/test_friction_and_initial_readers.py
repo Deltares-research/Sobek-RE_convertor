@@ -47,6 +47,12 @@ def test_read_conditions_extracts_lateral_discharge_tables() -> None:
 
     assert warnings == []
     by_id = {boundary.id: boundary for boundary in boundaries}
+    assert by_id["816"].node_name == "Waalds"
+    assert by_id["816"].quantity == "qhbnd"
+    assert [(point.time, point.value) for point in by_id["816"].series] == [
+        ("0", -0.0691),
+        ("20000", 13.2194),
+    ]
     assert by_id["815"].quantity == "dischargebnd"
     assert by_id["14304"].quantity == "waterlevelbnd"
     assert by_id["14305"].quantity == "waterlevelbnd"

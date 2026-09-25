@@ -56,7 +56,9 @@ def read_conditions(
 
         quantity = "dischargebnd"
         if series_record is not None:
-            if series_record.attrs.get("ty") == "0":
+            if _is_qh_boundary(series_record):
+                quantity = "qhbnd"
+            elif series_record.attrs.get("q_") == "dw":
                 quantity = "waterlevelbnd"
 
         boundaries.append(
@@ -123,6 +125,10 @@ def _parse_timeseries(
         previous_source_time = row[0]
         previous_time = time
     return tuple(series)
+
+
+def _is_qh_boundary(record: RawRecord) -> bool:
+    return record.attrs.get("q_") == "dw" and len(record.tables) >= 2
 
 
 def _as_float(value: str | None) -> float | None:

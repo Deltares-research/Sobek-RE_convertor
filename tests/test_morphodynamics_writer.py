@@ -37,7 +37,7 @@ def test_write_morphodynamics_files_writes_mor_and_sed(tmp_path: Path) -> None:
 
     assert "[Morphology]" in mor_text
     assert "[Underlayer]" in mor_text
-    assert "IniComp          = mor_composition.ini" in mor_text
+    assert "IniComp          = mini.ini" in mor_text
     assert "IUnderLyr        = 1" in mor_text
     assert sed_text.count("[Sediment]") == 3
     assert "SedDia           = 8.0000000e-04" in sed_text
@@ -121,7 +121,7 @@ def test_write_morphodynamics_files_writes_spatial_layer_composition(tmp_path: P
     assert "ThUnLyr          = 2.5000000e-01" in mor_text
 
     composition_text = composition_path.read_text(encoding="utf-8")
-    assert composition_path.name == "mor_composition.ini"
+    assert composition_path.name == "mini.ini"
     assert "Thick = gsd_ini_str/lyr01_thk.xyz" in composition_text
     assert "Thick = gsd_ini_str/lyr03_thk.xyz" in composition_text
     assert "Fraction1 = gsd_ini_str/lyr01_frac01.xyz" in composition_text

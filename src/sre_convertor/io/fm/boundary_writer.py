@@ -22,14 +22,15 @@ def write_boundary_conditions(
     ]
 
     for boundary in boundaries:
+        is_qh = boundary.quantity == "qhbnd"
         lines.extend(
             [
                 "[forcing]",
                 f"    name                  = {boundary.node_name}",
                 "    function              = timeseries",
                 "    time-interpolation    = linear",
-                "    quantity              = time",
-                f"    unit                  = minutes since {ref}",
+                f"    quantity              = {'waterlevel' if is_qh else 'time'}",
+                f"    unit                  = {'m' if is_qh else f'minutes since {ref}'}",
                 f"    quantity              = {boundary.quantity}",
                 f"    unit                  = {_quantity_unit(boundary.quantity)}",
             ]
@@ -43,10 +44,13 @@ def write_boundary_conditions(
             )
 
         for idx, point in enumerate(points):
-            minutes = _minutes_since_ref(point.time, runtime.refdate)
-            if minutes is None:
-                minutes = idx
-            lines.append(f"{minutes}\t{point.value:.6f}")
+            if is_qh:
+                lines.append(f"{point.time}\t{point.value:.6f}")
+            else:
+                minutes = _minutes_since_ref(point.time, runtime.refdate)
+                if minutes is None:
+                    minutes = idx
+                lines.append(f"{minutes}\t{point.value:.6f}")
 
         lines.append("")
 
@@ -81,7 +85,7 @@ def write_external_forcing_file(
                 "[boundary]",
                 f"quantity    = {boundary.quantity}",
                 f"nodeId      = {boundary.node_id}",
-                f"forcingfile = {prefix}BoundaryConditions.bc",
+                f"forcingfile = {prefix}bc.bc",
                 "",
             ]
         )

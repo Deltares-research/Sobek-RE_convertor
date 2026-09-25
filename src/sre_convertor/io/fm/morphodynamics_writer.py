@@ -6,7 +6,7 @@ import re
 from ...models import CrossSectionLocation, LayerCompositionSample, MorphodynamicsSummary, NetworkModel
 
 
-COMPOSITION_FILE_NAME = "mor_composition.ini"
+COMPOSITION_FILE_NAME = "mini.ini"
 MIN_VOLUME_FRACTION = 1.0e-6
 
 
@@ -67,7 +67,7 @@ def write_morphodynamics_files(
 [Underlayer]
     IUnderLyr        = {underlayer_type}
     ExchLyr          = false
-    IniComp          = mor_composition.ini
+    IniComp          = mini.ini
     TTLForm          = 1
     ThTrLyr          = 1.0
     MxNULyr          = {max_underlayers}

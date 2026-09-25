@@ -1,7 +1,11 @@
 from datetime import datetime
 from pathlib import Path
 
-from sre_convertor.io.fm.boundary_writer import write_external_forcing_file, write_lateral_bc_files
+from sre_convertor.io.fm.boundary_writer import (
+    write_boundary_conditions,
+    write_external_forcing_file,
+    write_lateral_bc_files,
+)
 from sre_convertor.models import BoundaryCondition, LateralDischarge, RuntimeSettings, TimeSeriesPoint
 
 
@@ -78,3 +82,34 @@ def test_write_external_forcing_file_uses_named_network_references(tmp_path: Pat
     text = target.read_text(encoding="utf-8")
     assert "nodeId      = upstream" in text
     assert "branchid              = Main river" in text
+
+
+def test_write_boundary_conditions_preserves_qh_relation_coordinates(tmp_path: Path) -> None:
+    boundaries = (
+        BoundaryCondition(
+            id="816",
+            name="Waalds",
+            node_id="2",
+            node_name="Waalds",
+            quantity="qhbnd",
+            series=(
+                TimeSeriesPoint(time="0", value=-0.0691),
+                TimeSeriesPoint(time="20000", value=13.2194),
+            ),
+        ),
+    )
+
+    target = tmp_path / "bc.bc"
+    runtime = RuntimeSettings(
+        refdate=datetime(2000, 1, 1),
+        tstart_seconds=0,
+        tstop_seconds=7200,
+    )
+    write_boundary_conditions(boundaries, runtime, target)
+
+    text = target.read_text(encoding="utf-8")
+    assert "quantity              = waterlevel" in text
+    assert "quantity              = qhbnd" in text
+    assert "unit                  = m3/s" in text
+    assert "0\t-0.069100" in text
+    assert "20000\t13.219400" in text

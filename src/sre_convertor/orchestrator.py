@@ -80,9 +80,9 @@ def convert_network_case(
     dflowfm_dir = output_dir / "dflowfm"
     dflowfm_dir.mkdir(parents=True, exist_ok=True)
 
-    net_filename = f"{options.model_name}_net.nc"
+    net_filename = "grd_net.nc"
     mdu_filename = f"{options.model_name}.mdu"
-    ext_filename = f"{options.model_name}.ext"
+    ext_filename = "ext.ext"
 
     created_files: list[Path] = []
 
@@ -108,8 +108,8 @@ def convert_network_case(
             create_unique_definitions=create_unique,
         )
         warnings.extend(cross_interp_warnings)
-        cross_def_name = "CrossSectionDefinitions.ini"
-        cross_loc_name = "CrossSectionLocations.ini"
+        cross_def_name = "csd.ini"
+        cross_loc_name = "csl.ini"
         write_cross_section_definitions(
             cross_defs_fm,
             dflowfm_dir / cross_def_name,
@@ -126,7 +126,7 @@ def convert_network_case(
         cross_def_name = None
         cross_loc_name = None
 
-    boundary_file_name = "BoundaryConditions.bc"
+    boundary_file_name = "bc.bc"
     write_boundary_conditions(boundaries_for_fm, case_model.runtime, dflowfm_dir / boundary_file_name)
     created_files.append(dflowfm_dir / boundary_file_name)
 
@@ -150,7 +150,7 @@ def convert_network_case(
         )
 
     if valid_structures:
-        structure_file_name = "Structures.ini"
+        structure_file_name = "struct.ini"
         write_structures(
             valid_structures,
             dflowfm_dir / structure_file_name,
@@ -174,14 +174,14 @@ def convert_network_case(
         )
         created_files.append(roughness_path)
 
-    initial_water_depth_name = "InitialWaterDepth.ini"
+    initial_water_depth_name = "fini_h.ini"
     write_initial_water_depth(
         dflowfm_dir / initial_water_depth_name,
         case_model.initial_conditions,
     )
     created_files.append(dflowfm_dir / initial_water_depth_name)
 
-    initial_fields_name = "initialFields.ini"
+    initial_fields_name = "fini.ini"
     write_initial_fields_reference(dflowfm_dir / initial_fields_name, initial_water_depth_name)
     created_files.append(dflowfm_dir / initial_fields_name)
 
@@ -321,7 +321,7 @@ def _convert_network_only(
     dflowfm_dir = output_dir / "dflowfm"
     dflowfm_dir.mkdir(parents=True, exist_ok=True)
 
-    net_filename = f"{options.model_name}_net.nc"
+    net_filename = "grd_net.nc"
     mdu_filename = f"{options.model_name}.mdu"
 
     write_network_netcdf(network, dflowfm_dir / net_filename)

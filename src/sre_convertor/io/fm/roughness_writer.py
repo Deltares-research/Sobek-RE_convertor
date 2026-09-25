@@ -51,7 +51,7 @@ def write_roughness(
         lines.extend(
             [
                 "[Branch]",
-                f"    branchId              = #{display_names[branch.id]}#",
+                f"    branchId              = {display_names[branch.id]}",
                 f"    frictionType          = {friction_type}",
                 "    functionType          = constant",
                 f"    numLocations          = {len(chainages)}",

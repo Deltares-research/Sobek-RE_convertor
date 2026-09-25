@@ -31,7 +31,7 @@ def test_convert_network_writes_minimum_fm_artifacts(tmp_path: Path) -> None:
 
     dimr_path = output_dir / "dimr_config.xml"
     mdu_path = output_dir / "dflowfm" / "demo.mdu"
-    net_path = output_dir / "dflowfm" / "demo_net.nc"
+    net_path = output_dir / "dflowfm" / "grd_net.nc"
 
     assert dimr_path.exists()
     assert mdu_path.exists()
@@ -42,7 +42,7 @@ def test_convert_network_writes_minimum_fm_artifacts(tmp_path: Path) -> None:
     assert "<inputFile>demo.mdu</inputFile>" in dimr
 
     mdu = mdu_path.read_text(encoding="utf-8")
-    assert "demo_net.nc" in mdu
+    assert "grd_net.nc" in mdu
 
     ds = xr.open_dataset(net_path)
     try:
@@ -89,18 +89,28 @@ def test_convert_case_activates_laterals_structures_and_initial_fields(tmp_path:
 
     dflowfm_dir = output_dir / "dflowfm"
     mdu = (dflowfm_dir / "demo_case.mdu").read_text(encoding="utf-8")
-    ext = (dflowfm_dir / "demo_case.ext").read_text(encoding="utf-8")
+    ext = (dflowfm_dir / "ext.ext").read_text(encoding="utf-8")
 
     assert "StructureFile                     = " in mdu
-    assert "IniFieldFile                      = initialFields.ini" in mdu
-    assert "CrossLocFile                      = CrossSectionLocations.ini" in mdu
-    assert "CrossDefFile                      = CrossSectionDefinitions.ini" in mdu
+    assert "IniFieldFile                      = fini.ini" in mdu
+    assert "CrossLocFile                      = csl.ini" in mdu
+    assert "CrossDefFile                      = csd.ini" in mdu
 
     assert "[lateral]" in ext
-    assert (dflowfm_dir / "initialFields.ini").exists()
+    assert (dflowfm_dir / "fini.ini").exists()
+    assert (dflowfm_dir / "fini_h.ini").exists()
+    assert (dflowfm_dir / "bc.bc").exists()
+    assert (dflowfm_dir / "csd.ini").exists()
+    assert (dflowfm_dir / "csl.ini").exists()
+    assert (dflowfm_dir / "struct.ini").exists()
 
     roughness = (dflowfm_dir / "roughness-Main.ini").read_text(encoding="utf-8")
     assert "frictionType          = Chezy" in roughness
+    assert all(
+        "#" not in line
+        for line in roughness.splitlines()
+        if line.strip().startswith("branchId")
+    )
 
 
 @pytest.mark.integration
@@ -169,7 +179,11 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "DEFICN.1: read " in log_text
     assert "GRAINP.TXT: read " in log_text
     assert "Parsed values read" in log_text
-    assert "lateral id=" in log_text
+    assert "Lateral\n  id=" in log_text
+    assert "Boundary\n  id=" in log_text
+    assert "  node_name=" in log_text
+    assert "Boundary\n  id='14304'" in log_text
+    assert "Boundary\n  id='14304'" in log_text and "  source=DEFCND.2" in log_text
     assert "time_start=" in log_text
     assert "time_end=" in log_text
     assert "minimum=" in log_text
@@ -184,6 +198,10 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "floodplain_1_width=" in log_text
     assert "floodplain_2_width=" in log_text
     assert "roughness branch=" in log_text
+    assert "section='Main channel'" in log_text
+    assert "chainage=0 value=" in log_text
+    assert "section='Floodplain 1'" in log_text
+    assert "section='Floodplain 2'" in log_text
     assert "initial condition branch=" in log_text
     assert "structure id=" in log_text
     assert "DEFTOP source records:" in log_text
@@ -226,7 +244,7 @@ def test_convert_network_writes_network_only_conversion_log(tmp_path: Path) -> N
     assert "read_sre_network: DEFTOP.1 and DEFGRD.* -> network model" in log_text
     assert "Grid connectivity:" in log_text
     assert "branch 101: 0 -> 1" in log_text
-    assert "dflowfm/network_log_net.nc" in log_text
+    assert "dflowfm/grd_net.nc" in log_text
     assert "dflowfm/network_log.mdu" in log_text
     assert "dimr_config.xml" in log_text
 
@@ -284,7 +302,7 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     assert "BedlevType                        = 1" in mdu
     assert (dflowfm_dir / "mor.mor").exists()
     assert (dflowfm_dir / "sed.sed").exists()
-    assert (dflowfm_dir / "mor_composition.ini").exists()
+    assert (dflowfm_dir / "mini.ini").exists()
     sed_text = (dflowfm_dir / "sed.sed").read_text(encoding="utf-8")
     log_text = (output_dir / "conversion.log").read_text(encoding="utf-8")
     assert "# SRE " not in sed_text
