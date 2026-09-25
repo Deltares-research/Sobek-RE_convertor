@@ -110,6 +110,7 @@ def write_conversion_log(
     report: ConversionReport,
     *,
     network_only: bool,
+    morphodynamics_conversion_details: str = "",
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_files = [path for path in report.files_created if path != output_path]
@@ -177,6 +178,12 @@ def write_conversion_log(
                 "- write_cross_section_* : cross sections -> dflowfm/CrossSection*.ini (when active)",
                 "- write_structures: valid structures -> dflowfm/Structures.ini (when present)",
                 "- write_roughness: friction data -> dflowfm/roughness-Main.ini, dflowfm/roughness-FloodPlain1.ini, dflowfm/roughness-FloodPlain2.ini",
+            ]
+        )
+        if morphodynamics_conversion_details:
+            lines.extend(["", morphodynamics_conversion_details])
+        lines.extend(
+            [
                 "- write_initial_*: initial conditions -> dflowfm/InitialWaterDepth.ini and initialFields.ini",
                 "- write_morphodynamics_files: morphology data -> dflowfm/mor.mor and related files (when active)",
                 "- copy/write RTC package: RTC data -> rtc/* (when active and available)",

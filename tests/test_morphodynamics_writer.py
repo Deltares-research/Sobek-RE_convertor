@@ -69,8 +69,8 @@ def test_write_morphodynamics_files_uses_sre_sediment_density_parameters(tmp_pat
 
     mor_text = mor_path.read_text(encoding="utf-8")
     sed_text = sed_path.read_text(encoding="utf-8")
-    assert "# SRE $GSOPT HEIOPT = GILL" in mor_text
-    assert "# SRE $GSOPT NONNGP" in sed_text
+    assert "# SRE $GSOPT HEIOPT = GILL" not in mor_text
+    assert "# SRE $GSOPT NONNGP" not in sed_text
     assert "{source_comments}" not in sed_text
     assert "RhoSol           = 2.6500000e+03" in sed_text
     assert "CDryB            = 1.8550000e+03" in sed_text
@@ -225,7 +225,7 @@ def test_write_morphodynamics_files_writes_spatial_acal_from_transport_mu(tmp_pa
 
     sed_text = sed_path.read_text(encoding="utf-8")
     assert "ACal             = #acal_01.xyz#" in sed_text
-    assert "# SRE DEFTRN branch b1 MU = 0.7" in sed_text
+    assert "# SRE DEFTRN branch b1 MU = 0.7" not in sed_text
     assert (tmp_path / "acal_01.xyz").read_text(encoding="utf-8").splitlines() == [
         "0.000000000000000E+00 0.000000000000000E+00 7.000000000000000E-01",
     ]

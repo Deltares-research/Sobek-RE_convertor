@@ -19,7 +19,7 @@ from .io.fm.initial_field_writer import (
     write_initial_fields_reference,
 )
 from .io.fm.mdu_writer import write_mdu
-from .io.fm.morphodynamics_writer import write_morphodynamics_files
+from .io.fm.morphodynamics_writer import format_morphodynamics_conversion_details, write_morphodynamics_files
 from .io.fm.net_writer import write_network_netcdf
 from .io.fm.names import branch_names
 from .io.fm.plot_writer import write_conversion_plots
@@ -285,6 +285,9 @@ def convert_network_case(
                 layer_count=case_model.morphodynamics.underlayer_count,
                 initial_conditions=case_model.initial_conditions,
                 roughness=case_model.roughness,
+                transport_parameters=case_model.morphodynamics.transport_parameters,
+                cross_section_definitions=case_model.cross_section_definitions,
+                cross_section_locations=case_model.cross_section_locations,
             )
         )
     log_path = write_conversion_log(
@@ -293,6 +296,15 @@ def convert_network_case(
         options,
         report,
         network_only=False,
+        morphodynamics_conversion_details=(
+            format_morphodynamics_conversion_details(
+                case_model.morphodynamics,
+                input_dir=input_dir,
+                output_dir=dflowfm_dir,
+            )
+            if include_morphology
+            else ""
+        ),
     )
     report.files_created.append(log_path)
     return report

@@ -118,6 +118,9 @@ def test_convert_case_creates_requested_plots(tmp_path: Path) -> None:
     branch_figure_paths = tuple((output_dir / "fig").glob("initial_sediment_composition_branch_*.png"))
     initial_condition_paths = tuple((output_dir / "fig").glob("initial_condition_branch_*.png"))
     friction_paths = tuple((output_dir / "fig").glob("friction_branch_*.png"))
+    acal_paths = tuple((output_dir / "fig").glob("acal_branch_*.png"))
+    width_paths = tuple((output_dir / "fig").glob("cross_section_widths_*.png"))
+    elevation_paths = tuple((output_dir / "fig").glob("cross_section_elevations_*.png"))
     assert figure_paths.issubset(set(report.files_created))
     assert all(path.exists() and path.stat().st_size > 0 for path in figure_paths)
     assert timeseries_paths
@@ -128,6 +131,12 @@ def test_convert_case_creates_requested_plots(tmp_path: Path) -> None:
     assert all(path in report.files_created and path.stat().st_size > 0 for path in initial_condition_paths)
     assert friction_paths
     assert all(path in report.files_created and path.stat().st_size > 0 for path in friction_paths)
+    assert acal_paths
+    assert all(path in report.files_created and path.stat().st_size > 0 for path in acal_paths)
+    assert width_paths
+    assert all(path in report.files_created and path.stat().st_size > 0 for path in width_paths)
+    assert elevation_paths
+    assert all(path in report.files_created and path.stat().st_size > 0 for path in elevation_paths)
 
 
 @pytest.mark.integration
@@ -276,6 +285,19 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     assert (dflowfm_dir / "mor.mor").exists()
     assert (dflowfm_dir / "sed.sed").exists()
     assert (dflowfm_dir / "mor_composition.ini").exists()
+    sed_text = (dflowfm_dir / "sed.sed").read_text(encoding="utf-8")
+    log_text = (output_dir / "conversion.log").read_text(encoding="utf-8")
+    assert "# SRE " not in sed_text
+    assert "Morphodynamics interpretation and FM conversion" in log_text
+    assert "SRE parameter conversion audit" in log_text
+    assert "PACFAC: read at GRAINP.TXT line" in log_text
+    assert "used in dflowfm/sed.sed CDryB (line" in log_text
+    assert "ALLUVIAL: read at GRAINP.TXT line" in log_text
+    assert "not used in FM output" in log_text
+    assert "-> one FM [Sediment] block per fraction" in log_text
+    assert "-> [Underlayer] in dflowfm/mor.mor" in log_text
+    assert log_text.index("write_cross_section_") < log_text.index("Morphodynamics interpretation")
+    assert log_text.index("write_roughness") < log_text.index("Morphodynamics interpretation")
     mor_text = (dflowfm_dir / "mor.mor").read_text(encoding="utf-8")
     assert "IUnderLyr        = 2" in mor_text
     assert "MxNULyr          = 19" in mor_text
