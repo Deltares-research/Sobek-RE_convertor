@@ -66,9 +66,9 @@ TimeStepType                      = 2
 FlowSolver                        = implicit1d
 
 [physics]
-UnifFrictCoef                     = 50
+UnifFrictCoef                     = 40
 UnifFrictType                     = 0
-UnifFrictCoef1D                   = 50
+UnifFrictCoef1D                   = 40
 
 [time]
 RefDate                           = {refdate}

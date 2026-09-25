@@ -375,14 +375,14 @@ def _read_sre_case(input_dir: Path, options: ConversionOptions) -> tuple[SreCase
     cross_defs, cross_locs, cross_warnings = read_cross_sections(input_dir)
     warnings.extend(cross_warnings)
 
-    boundaries, laterals, cnd_warnings = read_conditions(input_dir, network)
-    warnings.extend(cnd_warnings)
-
     runtime, run_warnings = read_runtime_settings(
         input_dir,
         test_duration_seconds=options.test_duration_seconds,
     )
     warnings.extend(run_warnings)
+
+    boundaries, laterals, cnd_warnings = read_conditions(input_dir, network, runtime)
+    warnings.extend(cnd_warnings)
 
     roughness, roughness_warnings = read_friction(input_dir)
     warnings.extend(roughness_warnings)

@@ -81,7 +81,7 @@ def _write_timeseries_plots(
 ) -> tuple[Path, ...]:
     paths: list[Path] = []
     for boundary in boundaries:
-        if boundary.series:
+        if boundary.series and boundary.quantity != "qhbnd":
             boundary_name = _entity_name(boundary.name, boundary.node_name)
             path = target_dir / f"timeseries_boundary_{_filename_name(boundary_name)}.png"
             _write_single_timeseries_plot(

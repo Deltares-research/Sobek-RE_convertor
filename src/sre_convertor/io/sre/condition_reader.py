@@ -3,13 +3,14 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from ...models import BoundaryCondition, LateralDischarge, NetworkModel, TimeSeriesPoint
+from ...models import BoundaryCondition, LateralDischarge, NetworkModel, RuntimeSettings, TimeSeriesPoint
 from .records import RawRecord, load_records
 
 
 def read_conditions(
     input_dir: Path,
     network: NetworkModel,
+    runtime: RuntimeSettings | None = None,
 ) -> tuple[tuple[BoundaryCondition, ...], tuple[LateralDischarge, ...], list[str]]:
     warnings: list[str] = []
 
@@ -75,7 +76,9 @@ def read_conditions(
     laterals: list[LateralDischarge] = []
     for lateral_id, (branch_id, chainage, lateral_name) in sorted(lateral_locations.items()):
         series_record = lateral_series_records.get(lateral_id)
-        series = _parse_timeseries(series_record, duplicate_step_days=1) if series_record is not None else tuple()
+        series = _parse_timeseries(series_record, lateral_id, lateral_name, warnings) if series_record is not None else tuple()
+        if runtime is not None:
+            series = _extend_lateral_to_runtime_start(series, lateral_id, lateral_name, runtime, warnings)
 
         if not series:
             series = (
@@ -98,15 +101,16 @@ def read_conditions(
 
 def _parse_timeseries(
     record: RawRecord | None,
-    duplicate_step_days: int = 0,
+    lateral_id: str | None = None,
+    lateral_name: str | None = None,
+    warnings: list[str] | None = None,
 ) -> tuple[TimeSeriesPoint, ...]:
     if record is None or not record.tables:
         return tuple()
 
     rows = record.tables[0]
     series: list[TimeSeriesPoint] = []
-    previous_source_time = None
-    previous_time = None
+    duplicate_times: list[str] = []
     for row in rows:
         if len(row) < 2:
             continue
@@ -114,17 +118,48 @@ def _parse_timeseries(
         if value is None:
             continue
         time = row[0]
-        if duplicate_step_days and time == previous_source_time and previous_time is not None:
-            try:
-                parsed_time = datetime.strptime(previous_time, "%Y/%m/%d;%H:%M:%S")
-            except ValueError:
-                pass
-            else:
-                time = (parsed_time + timedelta(days=duplicate_step_days)).strftime("%Y/%m/%d;%H:%M:%S")
+        if series and time == series[-1].time:
+            if time not in duplicate_times:
+                duplicate_times.append(time)
+            continue
         series.append(TimeSeriesPoint(time=time, value=value))
-        previous_source_time = row[0]
-        previous_time = time
+    if duplicate_times and warnings is not None:
+        label = f"{lateral_id} ({lateral_name})" if lateral_name else str(lateral_id)
+        warnings.append(
+            f"Lateral {label} contains duplicate timestamps at {', '.join(duplicate_times)}; "
+            "retained the first value for each timestamp."
+        )
     return tuple(series)
+
+
+def _extend_lateral_to_runtime_start(
+    series: tuple[TimeSeriesPoint, ...],
+    lateral_id: str,
+    lateral_name: str,
+    runtime: RuntimeSettings,
+    warnings: list[str],
+) -> tuple[TimeSeriesPoint, ...]:
+    if not series:
+        return series
+
+    start = runtime.refdate + timedelta(seconds=runtime.tstart_seconds)
+    start_text = start.strftime("%Y/%m/%d;%H:%M:%S")
+    first_time = _parse_time(series[0].time)
+    if first_time is None or first_time <= start:
+        return series
+
+    warnings.append(
+        f"Lateral {lateral_id} ({lateral_name}) starts at {series[0].time}, after the simulation start "
+        f"at {start_text}; added a start point using the first value ({series[0].value:g})."
+    )
+    return (TimeSeriesPoint(time=start_text, value=series[0].value), *series)
+
+
+def _parse_time(value: str) -> datetime | None:
+    try:
+        return datetime.strptime(value, "%Y/%m/%d;%H:%M:%S")
+    except ValueError:
+        return None
 
 
 def _is_qh_boundary(record: RawRecord) -> bool:

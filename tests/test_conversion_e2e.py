@@ -96,6 +96,9 @@ def test_convert_case_activates_laterals_structures_and_initial_fields(tmp_path:
     assert "CrossLocFile                      = csl.ini" in mdu
     assert "CrossDefFile                      = csd.ini" in mdu
     assert "FlowSolver                        = implicit1d" in mdu
+    assert "UnifFrictCoef                     = 40" in mdu
+    assert "UnifFrictType                     = 0" in mdu
+    assert "UnifFrictCoef1D                   = 40" in mdu
 
     assert "[lateral]" in ext
     assert (dflowfm_dir / "fini.ini").exists()
@@ -136,6 +139,7 @@ def test_convert_case_creates_requested_plots(tmp_path: Path) -> None:
     assert all(path.exists() and path.stat().st_size > 0 for path in figure_paths)
     assert timeseries_paths
     assert all(path in report.files_created and path.stat().st_size > 0 for path in timeseries_paths)
+    assert not (output_dir / "fig" / "timeseries_boundary_Waalds.png").exists()
     assert len(branch_figure_paths) == 7
     assert all(path in report.files_created and path.stat().st_size > 0 for path in branch_figure_paths)
     assert initial_condition_paths
@@ -180,6 +184,8 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "DEFICN.1: read " in log_text
     assert "GRAINP.TXT: read " in log_text
     assert "Parsed values read" in log_text
+    assert "contains duplicate timestamps" in log_text
+    assert "added a start point using the first value" in log_text
     assert "Lateral\n  id=" in log_text
     assert "Boundary\n  id=" in log_text
     assert "  node_name=" in log_text

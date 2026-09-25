@@ -5,6 +5,7 @@ from sre_convertor.io.sre.initial_conditions_reader import read_initial_conditio
 from sre_convertor.io.sre.morphodynamics_reader import read_morphodynamics_summary
 from sre_convertor.io.sre.condition_reader import read_conditions
 from sre_convertor.io.sre.network_reader import read_sre_network
+from sre_convertor.io.sre.runtime_reader import read_runtime_settings
 
 
 def test_read_friction_extracts_branch_chezy_values() -> None:
@@ -43,9 +44,11 @@ def test_read_conditions_extracts_lateral_discharge_tables() -> None:
     input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
 
     network = read_sre_network(input_dir)
-    boundaries, laterals, warnings = read_conditions(input_dir, network)
+    runtime, runtime_warnings = read_runtime_settings(input_dir, test_duration_seconds=0)
+    boundaries, laterals, warnings = read_conditions(input_dir, network, runtime)
 
-    assert warnings == []
+    assert runtime_warnings == []
+    assert len(warnings) == 4
     by_id = {boundary.id: boundary for boundary in boundaries}
     assert by_id["816"].node_name == "Waalds"
     assert by_id["816"].quantity == "qhbnd"
@@ -57,15 +60,11 @@ def test_read_conditions_extracts_lateral_discharge_tables() -> None:
     assert by_id["14304"].quantity == "waterlevelbnd"
     assert by_id["14305"].quantity == "waterlevelbnd"
     by_name = {lateral.name: lateral for lateral in laterals}
-    assert [point.value for point in by_name["Driel_Up"].series] == [0.0, 0.0, 0.0, -30.0, -30.0, -30.0]
-    assert [point.value for point in by_name["Amero_up"].series] == [0.0, 0.0, -30.0, -30.0]
+    assert [point.value for point in by_name["Driel_Up"].series] == [0.0, 0.0]
+    assert [point.value for point in by_name["Amero_up"].series] == [0.0, 0.0]
     assert [point.time for point in by_name["Driel_Up"].series] == [
+        "2000/01/01;00:00:00",
         "2149/12/31;00:00:00",
-        "2150/01/01;00:00:00",
-        "2150/01/02;00:00:00",
-        "2150/01/03;00:00:00",
-        "2150/01/04;00:00:00",
-        "2150/01/05;00:00:00",
     ]
 
 
