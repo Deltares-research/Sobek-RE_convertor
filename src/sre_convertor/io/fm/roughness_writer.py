@@ -24,8 +24,8 @@ def write_roughness(
         "",
         "[Global]",
         f"    frictionId            = #{friction_id}#",
-        "    frictionType          = Manning",
-        "    frictionValue         = 0.030",
+        "    frictionType          = Chezy",
+        "    frictionValue         = 42",
         "",
     ]
 

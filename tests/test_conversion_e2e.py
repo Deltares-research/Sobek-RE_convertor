@@ -110,6 +110,7 @@ def test_convert_case_activates_laterals_structures_and_initial_fields(tmp_path:
 
     roughness = (dflowfm_dir / "roughness-Main.ini").read_text(encoding="utf-8")
     assert "frictionType          = Chezy" in roughness
+    assert "frictionValue         = 42" in roughness
     assert all(
         "#" not in line
         for line in roughness.splitlines()
