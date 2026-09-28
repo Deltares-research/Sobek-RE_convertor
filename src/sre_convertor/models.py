@@ -216,6 +216,7 @@ class SreCaseModel:
 class ConversionOptions:
     model_name: str = "sre2fm_network"
     network_only: bool = False
+    flow_solver: str = "generic1d2d3d"
     activate_cross_sections: bool = True
     test_duration_seconds: int = 7200
     activate_morphodynamics: bool = False

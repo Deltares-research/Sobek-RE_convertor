@@ -95,7 +95,7 @@ def test_convert_case_activates_laterals_structures_and_initial_fields(tmp_path:
     assert "IniFieldFile                      = fini.ini" in mdu
     assert "CrossLocFile                      = csl.ini" in mdu
     assert "CrossDefFile                      = csd.ini" in mdu
-    assert "FlowSolver                        = implicit1d" in mdu
+    assert "FlowSolver                        = generic1d2d3d" in mdu
     assert "UnifFrictCoef                     = 40" in mdu
     assert "UnifFrictType                     = 0" in mdu
     assert "UnifFrictCoef1D                   = 40" in mdu

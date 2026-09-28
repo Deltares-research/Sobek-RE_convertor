@@ -16,11 +16,13 @@ def convert_network(
     create_plots: bool = False,
     include_input_files: bool = False,
     include_input_read_details: bool = False,
+    flow_solver: str = "generic1d2d3d",
 ) -> ConversionReport:
     """Convert only the SRE network into a minimal FM schematization."""
     options = ConversionOptions(
         model_name=model_name,
         network_only=True,
+        flow_solver=flow_solver,
         test_duration_seconds=test_duration_seconds,
         create_plots=create_plots,
         include_input_files=include_input_files,
@@ -41,11 +43,13 @@ def convert_case(
     create_plots: bool = False,
     include_input_files: bool = False,
     include_input_read_details: bool = False,
+    flow_solver: str = "generic1d2d3d",
 ) -> ConversionReport:
     """Convert an SRE case to a runnable FM schematization with supporting files."""
     options = ConversionOptions(
         model_name=model_name,
         network_only=False,
+        flow_solver=flow_solver,
         activate_cross_sections=activate_cross_sections,
         test_duration_seconds=test_duration_seconds,
         create_plots=create_plots,

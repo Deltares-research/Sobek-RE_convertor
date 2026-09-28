@@ -17,6 +17,7 @@ def write_mdu(
     roughness_file_names: tuple[str, ...],
     ini_field_file_name: str | None,
     runtime: RuntimeSettings,
+    flow_solver: str = "generic1d2d3d",
     observation_file_name: str | None = None,
     include_morphology: bool = False,
 ) -> None:
@@ -63,7 +64,7 @@ Conveyance2D                      = -1                  # -1: R=HU,0: R=H, 1: R=
 [numerics]
 CFLMax                            = 0.7
 TimeStepType                      = 2
-FlowSolver                        = implicit1d
+FlowSolver                        = {flow_solver}
 
 [physics]
 UnifFrictCoef                     = 40

@@ -243,6 +243,7 @@ def convert_network_case(
         roughness_file_names=roughness_file_names,
         ini_field_file_name=initial_fields_name,
         runtime=case_model.runtime,
+        flow_solver=options.flow_solver,
         observation_file_name=observation_file_name,
         include_morphology=include_morphology,
     )
@@ -340,6 +341,7 @@ def _convert_network_only(
         roughness_file_names=tuple(),
         ini_field_file_name=None,
         runtime=RuntimeSettings(refdate=datetime(2000, 1, 1), tstart_seconds=0, tstop_seconds=86400),
+        flow_solver=options.flow_solver,
     )
     write_dimr_config(output_dir / "dimr_config.xml", mdu_filename)
 
