@@ -1,0 +1,41 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Temporary RTC tests",
+			"type": "shell",
+			"command": "C:\\checkouts\\sre_convertor\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-m",
+				"pytest",
+				"-c",
+				"C:\\checkouts\\sre_convertor\\pyproject.toml",
+				"C:\\checkouts\\sre_convertor\\tests\\test_rtc_writer.py",
+				"C:\\checkouts\\sre_convertor\\tests\\test_sre_rtc_reader.py"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Temporary RTC schema validation",
+			"type": "shell",
+			"command": "C:\\checkouts\\sre_convertor\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-c",
+				"import importlib.util\nimport tempfile\nfrom pathlib import Path\nfrom lxml import etree\n\ntest_path = Path(r\"C:\\checkouts\\sre_convertor\\tests\\test_rtc_writer.py\")\nspec = importlib.util.spec_from_file_location(\"rtc_writer_test_module\", test_path)\nassert spec is not None and spec.loader is not None\nmodule = importlib.util.module_from_spec(spec)\nspec.loader.exec_module(module)\nsummary, network, structures, runtime = module._synthetic_case()\ncompilation = module.compile_sre_rtc(summary, network, structures, runtime)\nwith tempfile.TemporaryDirectory() as directory:\n    package = Path(directory) / \"rtc\"\n    module.write_sre_rtc_package(compilation, package, Path(directory) / \"dflowfm\")\n    xml_dir = package / \"xml_dir\"\n    xsd_dir = package / \"xsd_dir\"\n    validated = []\n    parsed = []\n    for xml_path in sorted(xml_dir.glob(\"*.xml\")):\n        document = etree.parse(str(xml_path))\n        parsed.append(xml_path.name)\n        xsd_path = xsd_dir / f\"{xml_path.stem}.xsd\"\n        if xsd_path.is_file():\n            schema = etree.XMLSchema(etree.parse(str(xsd_path)))\n            schema.assertValid(document)\n            validated.append(xml_path.name)\n    print(f\"Parsed XML: {', '.join(parsed)}\")\n    print(f\"XSD-validated XML: {', '.join(validated)}\")"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Temporary RTC schema validation script",
+			"type": "shell",
+			"command": "C:\\checkouts\\sre_convertor\\.venv\\Scripts\\python.exe",
+			"args": [
+				"C:\\checkouts\\sre_convertor\\tmp_rtc_schema_validation.py"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

@@ -84,6 +84,9 @@ def test_read_morphodynamics_summary_detects_source_signals() -> None:
     assert summary.branch_composition
     assert summary.underlayer_count == 20
     assert summary.underlayer_thickness_m == 0.5
+    assert len(summary.active_layer_thicknesses) == 7
+    assert {item.thickness_m for item in summary.active_layer_thicknesses} == {0.8}
+    assert summary.active_layer_thickness_m == 0.8
     assert dict(summary.sediment_parameters) == {
         "ALLUVIAL": "0.2",
         "KINVIS": "0.000001",
@@ -107,6 +110,12 @@ def test_read_morphodynamics_summary_detects_source_signals() -> None:
     assert first_transport.formula_type == 1
     assert first_transport.calibration_factor == 0.7
     assert ("E1", 0.4) in first_transport.coefficients
+    assert len(summary.transport_formulas) == 7
+    first_formula = summary.transport_formulas[0]
+    assert first_formula.branch_id == "453"
+    assert first_formula.formula_name == "MEY1"
+    assert first_formula.calibration_factor == 1.3
+    assert first_formula.options[:4] == ("0.7", "0.043", "MPMEXP", "1")
     assert len(summary.layer_composition) == 1084
     assert len(summary.layer_composition[0].layer_weights) == 20
     first_branch, first_weights = summary.branch_composition[0]

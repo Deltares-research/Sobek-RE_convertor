@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 from xml.sax.saxutils import escape
 
-from .rtc_writer import RtcCoupling, RtcCouplingItem
+
+@dataclass(frozen=True)
+class RtcCouplingItem:
+    source_name: str
+    target_name: str
+
+
+@dataclass(frozen=True)
+class RtcCoupling:
+    flow_to_rtc: tuple[RtcCouplingItem, ...]
+    rtc_to_flow: tuple[RtcCouplingItem, ...]
 
 
 def write_dimr_config(

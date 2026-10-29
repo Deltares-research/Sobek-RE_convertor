@@ -11,15 +11,18 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from ...models import (
+    ActiveLayerThicknessDefinition,
     BoundaryCondition,
     BranchInitialCondition,
     BranchRoughness,
     BranchTransportParameters,
     CrossSectionDefinition,
     CrossSectionLocation,
+    Branch,
     LayerCompositionSample,
     LateralDischarge,
     NetworkModel,
+    Node,
 )
 
 
@@ -32,6 +35,7 @@ def write_conversion_plots(
     branch_composition: tuple[tuple[str, tuple[float, ...]], ...] = (),
     layer_composition: tuple[LayerCompositionSample, ...] = (),
     layer_count: int | None = None,
+    active_layer_thicknesses: tuple[ActiveLayerThicknessDefinition, ...] = (),
     initial_conditions: tuple[BranchInitialCondition, ...] = (),
     roughness: tuple[BranchRoughness, ...] = (),
     transport_parameters: tuple[BranchTransportParameters, ...] = (),
@@ -39,13 +43,15 @@ def write_conversion_plots(
     cross_section_locations: tuple[CrossSectionLocation, ...] = (),
 ) -> tuple[Path, ...]:
     target_dir.mkdir(parents=True, exist_ok=True)
+    for stale_name in ("initial_sediment_composition.png", "initial_top_layer_thickness.png"):
+        stale_path = target_dir / stale_name
+        if stale_path.exists():
+            stale_path.unlink()
     branch_names = {branch.id: branch.name for branch in network.branches}
     timeseries_paths = _write_timeseries_plots(target_dir, boundaries, laterals)
-    paths = timeseries_paths + (
-        target_dir / "grid.png",
-        target_dir / "initial_sediment_composition.png",
-    )
-    _write_grid_plot(paths[-2], network)
+    grid_path = target_dir / "grid.png"
+    _write_grid_plot(grid_path, network)
+    paths = timeseries_paths + (grid_path,)
     paths = paths + _write_branch_composition_plots(
         target_dir,
         sediment_fractions,
@@ -53,8 +59,11 @@ def write_conversion_plots(
         layer_count,
         branch_names,
     )
-    _write_sediment_composition_plot(
-        paths[len(timeseries_paths) + 1], sediment_fractions, branch_composition, branch_names
+    paths = paths + _write_initial_first_layer_thickness_plots(
+        target_dir,
+        cross_section_locations,
+        active_layer_thicknesses,
+        branch_names,
     )
     paths = paths + _write_initial_condition_plots(target_dir, initial_conditions, branch_names)
     paths = paths + _write_friction_plots(target_dir, roughness, branch_names)
@@ -168,6 +177,60 @@ def _write_initial_condition_plots(
     figure.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(figure)
     return (path,)
+
+
+def _write_initial_first_layer_thickness_plots(
+    target_dir: Path,
+    locations: tuple[CrossSectionLocation, ...],
+    thickness_definitions: tuple[ActiveLayerThicknessDefinition, ...],
+    branch_names: dict[str, str],
+) -> tuple[Path, ...]:
+    if not thickness_definitions:
+        return tuple()
+
+    locations_by_branch: dict[str, list[CrossSectionLocation]] = {}
+    for location in locations:
+        locations_by_branch.setdefault(location.branch_id, []).append(location)
+
+    paths: list[Path] = []
+    for branch_id, branch_locations in sorted(locations_by_branch.items()):
+        branch_locations.sort(key=lambda location: location.chainage)
+        branch_name = _entity_name(branch_names.get(branch_id, ""), branch_id)
+        branch_definitions = [item for item in thickness_definitions if item.branch_id == branch_id]
+        if not branch_definitions:
+            continue
+
+        def thickness_at(chainage: float) -> float | None:
+            for definition in branch_definitions:
+                if definition.start_chainage <= chainage <= definition.end_chainage:
+                    return definition.thickness_m
+            return None
+
+        plotted = [
+            (location.chainage, thickness)
+            for location in branch_locations
+            if (thickness := thickness_at(location.chainage)) is not None
+        ]
+        if not plotted:
+            continue
+        figure, axis = plt.subplots(figsize=(11, 6))
+        axis.plot(
+            [chainage for chainage, _ in plotted],
+            [thickness for _, thickness in plotted],
+            color="#2d5f73",
+            marker="o",
+            markersize=3,
+        )
+        axis.set_title(f"Active layer thickness: {branch_name}")
+        axis.set_xlabel("Chainage")
+        axis.set_ylabel("Thickness (m)")
+        axis.grid(True, alpha=0.25)
+        figure.tight_layout()
+        path = target_dir / f"initial_layer_thickness_branch_{_filename_name(branch_name)}.png"
+        figure.savefig(path, dpi=150, bbox_inches="tight")
+        plt.close(figure)
+        paths.append(path)
+    return tuple(paths)
 
 
 def _write_friction_plots(
@@ -363,14 +426,25 @@ def _percentile(values: list[float], fraction: float) -> float:
 def _write_grid_plot(path: Path, network: NetworkModel) -> None:
     figure, axis = plt.subplots(figsize=(10, 7))
     nodes = {node.id: node for node in network.nodes}
+    plot_groups: dict[tuple[str, int, int], list[Branch]] = {}
+    for branch in network.branches:
+        direction_key = _plot_direction_key(branch, nodes)
+        if direction_key is None:
+            continue
+        plot_groups.setdefault(
+            direction_key,
+            [],
+        ).append(branch)
+
     for branch in network.branches:
         from_node = nodes.get(branch.from_node_id)
         to_node = nodes.get(branch.to_node_id)
         if from_node is None or to_node is None:
             continue
         offsets = _grid_offsets(branch.grid_chainages, branch.length)
-        x_values = [from_node.x + (to_node.x - from_node.x) * offset / branch.length for offset in offsets]
-        y_values = [from_node.y + (to_node.y - from_node.y) * offset / branch.length for offset in offsets]
+        group = plot_groups.get(_plot_direction_key(branch, nodes), [])
+        curve_index = group.index(branch) if len(group) > 1 else 0
+        x_values, y_values = _branch_plot_points(from_node, to_node, offsets, curve_index, len(group))
         axis.plot(x_values, y_values, color="#2d5f73", linewidth=1.0)
         axis.scatter(x_values, y_values, color="#e07a5f", s=9, zorder=2)
         axis.annotate(
@@ -405,6 +479,45 @@ def _write_grid_plot(path: Path, network: NetworkModel) -> None:
     figure.tight_layout()
     figure.savefig(path, dpi=150)
     plt.close(figure)
+
+
+def _plot_direction_key(
+    branch: Branch,
+    nodes: dict[str, Node],
+) -> tuple[str, int, int] | None:
+    from_node = nodes.get(branch.from_node_id)
+    to_node = nodes.get(branch.to_node_id)
+    if from_node is None or to_node is None:
+        return None
+    dx = to_node.x - from_node.x
+    dy = to_node.y - from_node.y
+    length = (dx * dx + dy * dy) ** 0.5
+    if length == 0.0:
+        return None
+    return (branch.from_node_id, round(dx / length, 12), round(dy / length, 12))
+
+
+def _branch_plot_points(
+    from_node,
+    to_node,
+    offsets: tuple[float, ...],
+    curve_index: int,
+    curve_count: int,
+) -> tuple[list[float], list[float]]:
+    dx = to_node.x - from_node.x
+    dy = to_node.y - from_node.y
+    branch_length = (dx * dx + dy * dy) ** 0.5
+    curve_offset = 0.0
+    if curve_count > 1 and branch_length > 0.0:
+        curve_offset = (curve_index - (curve_count - 1) / 2) * branch_length * 0.04
+
+    x_values: list[float] = []
+    y_values: list[float] = []
+    for offset in offsets:
+        fraction = offset / branch_length
+        x_values.append(from_node.x + dx * fraction - dy / branch_length * curve_offset * 4 * fraction * (1 - fraction))
+        y_values.append(from_node.y + dy * fraction + dx / branch_length * curve_offset * 4 * fraction * (1 - fraction))
+    return x_values, y_values
 
 
 def _write_sediment_composition_plot(

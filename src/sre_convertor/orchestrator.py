@@ -25,7 +25,7 @@ from .io.fm.names import branch_names
 from .io.fm.plot_writer import write_conversion_plots
 from .io.fm.roughness_writer import write_roughness
 from .io.fm.run_writer import write_run_dimr_bat
-from .io.fm.rtc_writer import RtcCoupling, copy_rtc_package, write_native_rtc_package, write_sre_rtc_inventory
+from .io.fm.rtc_writer import compile_sre_rtc, write_sre_rtc_package
 from .io.fm.structure_writer import write_structures
 from .io.sre.condition_reader import read_conditions
 from .io.sre.cross_section_reader import read_cross_sections
@@ -76,6 +76,17 @@ def convert_network_case(
 
     warnings = list(read_warnings)
     warnings.extend(_validate_network(case_model.network))
+
+    rtc_compilation = None
+    if options.activate_rtc:
+        rtc_summary, rtc_warnings = read_sre_rtc(input_dir)
+        warnings.extend(rtc_warnings)
+        rtc_compilation = compile_sre_rtc(
+            rtc_summary,
+            case_model.network,
+            case_model.structures,
+            case_model.runtime,
+        )
 
     dflowfm_dir = output_dir / "dflowfm"
     dflowfm_dir.mkdir(parents=True, exist_ok=True)
@@ -201,36 +212,21 @@ def convert_network_case(
                 "activate_morphodynamics=True requested, but no active morphology switch was found in DEFSUB.*."
             )
 
-    include_rtc = False
-    rtc_coupling: RtcCoupling | None = None
-    observation_file_name = None
-    if options.activate_rtc:
-        rtc_source_dir = options.rtc_source_dir or input_dir / "rtc"
-        if rtc_source_dir.is_dir():
-            rtc_dir, rtc_coupling = copy_rtc_package(rtc_source_dir, output_dir / "rtc")
-            created_files.extend(path for path in rtc_dir.rglob("*") if path.is_file())
-            include_rtc = True
-        else:
-            warnings.append(f"activate_rtc=True requested, but no RTC package was found at {rtc_source_dir}.")
-            if case_model.rtc.controllers or case_model.rtc.triggers:
-                inventory_path = write_sre_rtc_inventory(output_dir / "rtc_sre_inventory.json", case_model.rtc)
-                created_files.append(inventory_path)
-                rtc_dir, rtc_coupling, observation_path, native_rtc_warnings = write_native_rtc_package(
-                    output_dir / "rtc",
-                    case_model.rtc,
-                    case_model.runtime,
-                    branch_names=branch_names(case_model.network),
-                )
-                created_files.extend(path for path in rtc_dir.rglob("*") if path.is_file())
-                if observation_path is not None:
-                    observation_file_name = observation_path.name
-                    created_files.append(observation_path)
-                warnings.extend(native_rtc_warnings)
-                warnings.append(
-                    "Native SRE RTC CNTL/TRGR records were synthesized into an RTC package; "
-                    "PID/trigger parity is approximate and should be reviewed against SOBEK behavior."
-                )
-                include_rtc = True
+    include_rtc = rtc_compilation is not None
+    rtc_coupling = rtc_compilation.rtc_coupling if rtc_compilation is not None else None
+    observation_file_name = (
+        rtc_compilation.observation_file_name
+        if rtc_compilation is not None
+        else None
+    )
+    if rtc_compilation is not None:
+        created_files.extend(
+            write_sre_rtc_package(
+                rtc_compilation,
+                output_dir / "rtc",
+                dflowfm_dir,
+            )
+        )
 
     write_mdu(
         dflowfm_dir / mdu_filename,
@@ -256,6 +252,11 @@ def convert_network_case(
         rtc_coupling=rtc_coupling,
         start_time=case_model.runtime.tstart_seconds,
         stop_time=case_model.runtime.tstop_seconds,
+        rtc_timestep=(
+            rtc_compilation.timestep_seconds
+            if rtc_compilation is not None
+            else 600
+        ),
     )
     created_files.append(output_dir / "dimr_config.xml")
 
@@ -284,6 +285,7 @@ def convert_network_case(
                 branch_composition=case_model.morphodynamics.branch_composition,
                 layer_composition=case_model.morphodynamics.layer_composition,
                 layer_count=case_model.morphodynamics.underlayer_count,
+                active_layer_thicknesses=case_model.morphodynamics.active_layer_thicknesses,
                 initial_conditions=case_model.initial_conditions,
                 roughness=case_model.roughness,
                 transport_parameters=case_model.morphodynamics.transport_parameters,
@@ -398,9 +400,6 @@ def _read_sre_case(input_dir: Path, options: ConversionOptions) -> tuple[SreCase
     structures, structure_warnings = read_structures(input_dir)
     warnings.extend(structure_warnings)
 
-    rtc, rtc_warnings = read_sre_rtc(input_dir)
-    warnings.extend(rtc_warnings)
-
     return (
         SreCaseModel(
             network=network,
@@ -413,7 +412,6 @@ def _read_sre_case(input_dir: Path, options: ConversionOptions) -> tuple[SreCase
             roughness=roughness,
             initial_conditions=initial_conditions,
             morphodynamics=morphodynamics,
-            rtc=rtc,
         ),
         warnings,
     )

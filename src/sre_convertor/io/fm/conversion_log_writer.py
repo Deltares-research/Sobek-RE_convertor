@@ -15,7 +15,6 @@ _READ_STAGES = (
     ("read_initial_conditions", "DEFICN.*", "Initial conditions"),
     ("read_morphodynamics_summary", "DEFICN.*, DEFSUB.*, GRAINP.TXT", "Morphodynamics summary"),
     ("read_structures", "DEFSTR.*", "Structures"),
-    ("read_sre_rtc", "DEFSTR.*", "RTC controllers and triggers"),
 )
 
 
@@ -132,7 +131,6 @@ def write_conversion_log(
         f"create_plots = {options.create_plots}",
         f"activate_morphodynamics = {options.activate_morphodynamics}",
         f"activate_rtc = {options.activate_rtc}",
-        f"rtc_source_dir = {options.rtc_source_dir}",
         f"include_input_files = {options.include_input_files}",
         f"include_input_read_details = {options.include_input_read_details}",
     ]
@@ -169,6 +167,10 @@ def write_conversion_log(
     else:
         for name, inputs, result in _READ_STAGES:
             lines.append(f"- {name}: {inputs} -> {result}")
+        if options.activate_rtc:
+            lines.append(
+                "- read_sre_rtc: DEFSTR.* -> typed SRE controllers, triggers, and structure links"
+            )
         lines.extend(
             [
                 "- write_network_netcdf: network model -> dflowfm/grd_net.nc",
@@ -186,8 +188,15 @@ def write_conversion_log(
             [
                 "- write_initial_*: initial conditions -> dflowfm/fini_h.ini and fini.ini",
                 "- write_morphodynamics_files: morphology data -> dflowfm/mor.mor and related files (when active)",
-                "- copy/write RTC package: RTC data -> rtc/* (when active and available)",
                 "- write_mdu: converted model settings -> dflowfm/<model>.mdu",
+            ]
+        )
+        if options.activate_rtc:
+            lines.append(
+                "- write_sre_rtc_package: SRE controls -> rtc/*, dflowfm/rtc_observations.xyn"
+            )
+        lines.extend(
+            [
                 "- write_dimr_config: FM/RTC configuration -> dimr_config.xml",
                 "- write_run_dimr_bat: run configuration -> run_dimr.bat",
             ]

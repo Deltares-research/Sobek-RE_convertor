@@ -39,8 +39,6 @@ Done:
 - Roughness conversion first pass (`DEFFRC.*`): branch-level representative Chezy values are written to `roughness-Main.ini`.
 - Initial conditions first pass (`DEFICN.*`): FLIN branch water levels are parsed and used to derive initial water depth default.
 - Structure warning audit from FM `.dia` output.
-- RTC package pass-through: `activate_rtc=True` copies a supplied RTC package and wires DIMR couplers from `rtcDataConfig.xml` OpenMI exchange items.
-- Native SRE RTC first pass: `DEFSTR.*` `CNTL`/`TRGR` records are parsed, inventoried in `rtc_sre_inventory.json`, and synthesized into a runnable D-RTC package for supported crest-level controllers and first-order trigger activation.
 
 In progress:
 
@@ -61,10 +59,45 @@ In progress:
 Not done yet:
 
 - Full morphodynamics/sediment parameter transfer from SRE to FM file set.
-- Full D-RTC controller parity for native SRE `CNTL`/`TRGR` definitions, including multi-trigger combinations and gate-height controllers.
 - Initial conditions beyond first-pass global depth proxy (for example detailed branch/profile fields where needed).
 - Roughness profile transfer at full spatial detail (currently reduced to representative branch value).
 - Stronger runtime acceptance criterion: "simulation advanced and produced expected history/map outputs", beyond initial output marker presence.
+
+## Real-time control (RTC)
+
+RTC is opt-in with `activate_rtc=True` and is compiled only from the selected
+SRE case. There is no option to provide a separate RTC folder. The converter
+The supported subset is SRE `ct=0` time-value schedules and `ct=1` hydraulic
+lookup controllers driven by a single hydraulic `ty=1` trigger. Interval and
+PID controllers, time triggers, combined triggers, and unsupported trigger
+combinations fail before an RTC package or DIMR RTC component is written.
+
+The compiler selects TBLE tables by their SRE role label: `Time Controller`
+for `ct=0` and `Hydraulic Controller` for `ct=1`; an auxiliary `Steer Table`
+is not used as the hydraulic lookup. Schedules are clipped/extended to cover
+the effective FM runtime. SRE uses continuous, non-periodic table lookup and
+holds the first/last table value outside its bounds; the converter reproduces
+that policy at schedule boundaries and configures D-RTC hydraulic lookup
+tables with `LINEAR` interpolation and `BLOCK` extrapolation (which returns the
+nearest endpoint value in the [Delft3D lookup implementation](https://github.com/Deltares/Delft3D/blob/3fed73cbc4dacde4ce51b52f3d92035f45534d0e/src/engines_gpl/fbc/packages/FBCTools/src/utilities/lookupTableConverter.cpp)).
+
+Hydraulic SRE `<` triggers are intentionally emitted as D-RTC `LessEqual`, so
+the lower-side rule wins at an exact threshold; `>` remains `Greater`. This
+makes the bundled paired thresholds exhaustive at equality. Crest-level
+actuators initialize to the maximum of the converted structure crest and the
+known controller outputs (the requested closed-weir initial state). Gate
+height is initialized from the SRE structure `gh` value; for Driel Omloop this
+is 0 m.
+
+The generated package references and includes the bundled D-RTC schemas. A
+full D-RTC runtime simulation has not yet been used to validate FM/RTC
+exchange-item behavior end to end.
+
+The source controls and their table periods are summarized below. The dates
+shown for `ct=0` controllers are value-schedule bounds, not calendar-time
+trigger conditions.
+
+![SRE model RTC controls](docs/rtc-controls.svg)
 
 ## Architecture
 

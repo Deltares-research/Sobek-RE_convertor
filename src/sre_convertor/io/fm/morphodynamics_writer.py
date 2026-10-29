@@ -37,8 +37,10 @@ def write_morphodynamics_files(
         fractions = (fallback,)
     layer_count = summary.underlayer_count or 1
     layer_thickness_m = summary.underlayer_thickness_m or 0.5
+    transport_layer_thickness_m = summary.active_layer_thickness_m or 1.0
     max_underlayers = max(layer_count - 1, 1)
     underlayer_type = 2 if layer_count > 1 else 1
+    ttl_form = _ttl_form(summary)
     sediment_parameter_values = _values_by_key(summary.sediment_parameters)
     relative_density = _float_value(sediment_parameter_values, "RELDEN", 1.65)
     porosity = _float_value(sediment_parameter_values, "PACFAC", 0.4)
@@ -68,8 +70,8 @@ def write_morphodynamics_files(
     IUnderLyr        = {underlayer_type}
     ExchLyr          = false
     IniComp          = mini.ini
-    TTLForm          = 1
-    ThTrLyr          = 1.0
+    TTLForm          = {ttl_form}
+    ThTrLyr          = {transport_layer_thickness_m:.7e}
     MxNULyr          = {max_underlayers}
     ThUnLyr          = {layer_thickness_m:.7e}
 """
@@ -191,6 +193,13 @@ def _chainage_to_xy(network: NetworkModel, branch_id: str, chainage: float) -> t
     x = from_node.x + (to_node.x - from_node.x) * ratio
     y = from_node.y + (to_node.y - from_node.y) * ratio
     return x, y
+
+
+def _ttl_form(summary: MorphodynamicsSummary) -> int:
+    lathic = dict(summary.graded_sediment_options).get("LATHIC", "").upper()
+    if lathic == "INITIAL":
+        return 1
+    return 1
 
 
 def _get_fraction_weights(summary: MorphodynamicsSummary, branch_id: str, fraction_count: int) -> tuple[float, ...]:
@@ -345,7 +354,10 @@ def format_morphodynamics_conversion_details(
         f"- Underlayers: NUNLAY={summary.underlayer_count or 1}, "
         f"DZUNLA={summary.underlayer_thickness_m or 0.5:g} m "
         "-> [Underlayer] in dflowfm/mor.mor and layer composition files.",
+        _active_layer_thickness_detail(summary),
         "- Sediment densities: SRE RELDEN/PACFAC -> FM RhoSol and CDryB in dflowfm/sed.sed.",
+        "- SRE $TRFORM MPMEXP is an obsolete MPM hiding/exposure option; the SRE parser maps it to experimental Egiazaroff with Dref, alpha, and gamma parameters.",
+        "- SRE $GSOPT HEIOPT=GILL selects the Gill dune-height calculation; it is not the hiding/exposure option and has no direct FM keyword in this conversion.",
         "- SRE DEFTRN calibration factors (MU) -> spatial ACal files acal_*.xyz referenced by sed.sed."
         if summary.transport_parameters
         else "- No SRE DEFTRN calibration factors were found; FM ACal uses the default value.",
@@ -353,36 +365,112 @@ def format_morphodynamics_conversion_details(
     ]
     source_lines = _grainp_parameter_lines(input_dir / "GRAINP.TXT") if input_dir else {}
     sed_lines = _output_key_lines(output_dir / "sed.sed", ("RhoSol", "CDryB", "SedDia")) if output_dir else {}
-    mor_lines = _output_key_lines(output_dir / "mor.mor", ("MxNULyr", "ThUnLyr")) if output_dir else {}
+    mor_lines = _output_key_lines(output_dir / "mor.mor", ("MxNULyr", "ThUnLyr", "ThTrLyr")) if output_dir else {}
     lines.extend([
         "",
         "SRE parameter conversion audit",
         "------------------------------",
-        "Each entry gives the SRE input line, then the FM output key and line when the value is applied.",
+        "Each entry gives the SRE meaning, source location, and the FM output key or limitation.",
     ])
     entries = (
-        ("$SEDPAR ALLUVIAL", "not used in FM output"),
-        ("$SEDPAR KINVIS", "not used in FM output"),
-        ("$SEDPAR PACFAC", _fm_location("sed.sed", "CDryB", sed_lines)),
-        ("$SEDPAR RELDEN", _fm_location("sed.sed", "RhoSol", sed_lines)),
-        ("$MORPAR ALPHADG", "read for traceability; not used in FM output"),
-        ("$MORPAR ALPHAEG", "read for traceability; not used in FM output"),
-        ("$MORPAR ITERMAX", "read for traceability; not used in FM output"),
-        ("$MORPAR METHOD", "read for traceability; not used in FM output"),
-        ("$MORPAR REDUC", "read for traceability; not used in FM output"),
-        ("$MORPAR STABGI", "read for traceability; not used in FM output"),
-        ("$MORPAR STABGT", "read for traceability; not used in FM output"),
-        ("$GSOPT HEIOPT", "read for traceability; not used in FM output"),
-        ("$GSOPT LATHIC", "read for traceability; not used in FM output"),
-        ("$FRACT", _fm_location("sed.sed", "SedDia", sed_lines)),
-        ("$GSOPT NUNLAY", _fm_location("mor.mor", "MxNULyr", mor_lines)),
-        ("$GSPAR DZUNLA", _fm_location("mor.mor", "ThUnLyr", mor_lines)),
-        ("DEFTRN MU", "used in acal_*.xyz, referenced by sed.sed ACal"),
+        ("$SEDPAR ALLUVIAL", "SRE alluvial-bed parameter; no direct FM equivalent identified"),
+        ("$SEDPAR KINVIS", "SRE kinematic viscosity used by graded-sediment dune/transport calculations; no direct FM output"),
+        ("$SEDPAR PACFAC", f"SRE bed porosity; {_fm_location('sed.sed', 'CDryB', sed_lines)}"),
+        ("$SEDPAR RELDEN", f"SRE relative sediment density; {_fm_location('sed.sed', 'RhoSol', sed_lines)}"),
+        ("$MORPAR ALPHADG", "SRE linear interpolation factor between Lax-Wendroff and upwind sediment continuity; no direct FM output"),
+        ("$MORPAR ALPHAEG", "SRE upwind-scheme stability parameter; no direct FM output"),
+        ("$MORPAR ITERMAX", "SRE maximum iteration steps for estuary morphology; no direct FM output"),
+        ("$MORPAR METHOD", "SRE sediment-width distribution method (EQUAL or PROPORTIONAL); no direct FM output"),
+        ("$MORPAR REDUC", "SRE reduction factor for actual sediment transport width; no direct FM output"),
+        ("$MORPAR STABGI", "SRE sediment-integral stability parameter; no direct FM output"),
+        ("$MORPAR STABGT", "SRE minimum-time-step stability parameter; no direct FM output"),
+        ("$GSOPT HEIOPT", "SRE dune-height option; GILL selects the Gill dune-height calculation, not hiding/exposure; no direct FM output"),
+        ("$GSOPT LATHIC", "SRE layer-thickness/composition initialization option; INITIAL is represented indirectly by mini.ini; no direct FM switch"),
+        ("$FRACT", f"SRE sediment-class bounds; {_fm_location('sed.sed', 'SedDia', sed_lines)}"),
+        ("$GSOPT NUNLAY", f"SRE number of underlayers; {_fm_location('mor.mor', 'MxNULyr', mor_lines)}"),
+        ("$GSPAR DZUNLA", f"SRE underlayer thickness; {_fm_location('mor.mor', 'ThUnLyr', mor_lines)}"),
+        ("$GSDEFF", f"SRE active transport-layer thickness; {_fm_location('mor.mor', 'ThTrLyr', mor_lines)}"),
+        ("DEFTRN MU", "SRE branch calibration factor; used in acal_*.xyz, referenced by sed.sed ACal"),
     )
     for parameter, destination in entries:
-        source = _source_location(parameter, source_lines, input_dir)
+        source = (
+            _transport_source_location(input_dir)
+            if parameter == "DEFTRN MU" and input_dir
+            else _source_location(parameter, source_lines, input_dir)
+        )
         lines.append(f"- {parameter}: read at {source}; {destination}.")
+    lines.extend(_transport_formula_audit(summary))
     return "\n".join(lines)
+
+
+def _active_layer_thickness_detail(summary: MorphodynamicsSummary) -> str:
+    definitions = summary.active_layer_thicknesses
+    if not definitions:
+        return "- Active transport-layer thickness: no GSDEFF records found; FM ThTrLyr uses the default 1 m."
+    values = sorted({item.thickness_m for item in definitions})
+    if summary.active_layer_thickness_m is not None:
+        return (
+            f"- Active transport-layer thickness: {len(definitions)} GSDEFF range(s) all use "
+            f"{summary.active_layer_thickness_m:g} m -> one FM ThTrLyr value is used."
+        )
+    return f"- Active transport-layer thickness: GSDEFF has non-uniform values ({', '.join(f'{value:g}' for value in values)} m); FM ThTrLyr uses the default 1 m."
+
+
+def _transport_formula_audit(summary: MorphodynamicsSummary) -> list[str]:
+    lines = [
+        "",
+        "Branch-specific sediment transport audit",
+        "-----------------------------------------",
+        "SRE DEFTRN ty codes: 0=Engelund-Hansen, 1=Meyer-Peter & Muller, 2=Ackers-White, 3=van Rijn, 4=Parker-Klingeman, 5=user-defined.",
+        "SRE $TRFORM MEY1 selects the special Meyer-Peter-Muller relation; MPMEXP is parsed by SRE as experimental Egiazaroff hiding/exposure with Dref selector, alpha, and gamma.",
+    ]
+    def_trn = {item.branch_id: item for item in summary.transport_parameters}
+    text_trform = {item.branch_id: item for item in summary.transport_formulas}
+    all_branch_ids = sorted(set(def_trn) | set(text_trform))
+    if set(def_trn) == set(text_trform):
+        lines.append(f"- Branch coverage: {len(all_branch_ids)} $TRFORM definitions match {len(def_trn)} DEFTRN records.")
+    else:
+        missing_trform = sorted(set(def_trn) - set(text_trform))
+        missing_deftrn = sorted(set(text_trform) - set(def_trn))
+        lines.append(
+            f"- Branch coverage mismatch: missing $TRFORM branches={missing_trform or 'none'}; "
+            f"missing DEFTRN branches={missing_deftrn or 'none'}."
+        )
+
+    for branch_id in all_branch_ids:
+        def_item = def_trn.get(branch_id)
+        trform_item = text_trform.get(branch_id)
+        def_formula = _transport_formula_name(def_item.formula_type) if def_item else "not found"
+        fm_formula = f"TraFrm={def_item.formula_type}" if def_item and def_item.formula_type is not None else "TraFrm=not available"
+        detail = f"branch {branch_id}: DEFTRN {def_formula}, {fm_formula}"
+        if def_item and def_item.calibration_factor is not None:
+            detail += f", MU={def_item.calibration_factor:g}"
+        if trform_item:
+            detail += f"; $TRFORM {trform_item.formula_name}"
+            if trform_item.calibration_factor is not None:
+                detail += f" calibration={trform_item.calibration_factor:g}"
+            if "MPMEXP" in trform_item.options:
+                option_index = trform_item.options.index("MPMEXP")
+                detail += f" MPMEXP parameters={' '.join(trform_item.options[option_index + 1:])}"
+        lines.append(f"- {detail}.")
+
+    formula_types = {item.formula_type for item in summary.transport_parameters if item.formula_type is not None}
+    if len(formula_types) <= 1:
+        lines.append("- FM limitation: TraFrm is configured per [Sediment] block rather than per branch; the current case is consistent because all DEFTRN branches use the same formula code.")
+    else:
+        lines.append("- FM limitation: TraFrm is configured per [Sediment] block rather than per branch; branch-specific SRE formula codes cannot currently be preserved exactly.")
+    return lines
+
+
+def _transport_formula_name(formula_type: int | None) -> str:
+    return {
+        0: "Engelund-Hansen",
+        1: "Meyer-Peter & Muller",
+        2: "Ackers-White",
+        3: "van Rijn",
+        4: "Parker-Klingeman",
+        5: "user-defined",
+    }.get(formula_type, f"unknown(code={formula_type})")
 
 
 def _grainp_parameter_lines(path: Path) -> dict[str, int]:
@@ -403,6 +491,8 @@ def _grainp_parameter_lines(path: Path) -> dict[str, int]:
                     result[f"{section} {key}"] = line_number
         if tokens and tokens[0].upper() == "$FRACT":
             result["$FRACT"] = line_number
+        if tokens and tokens[0].upper() == "$GSDEFF":
+            result["$GSDEFF"] = line_number
     return result
 
 
@@ -426,3 +516,16 @@ def _source_location(parameter: str, source_lines: dict[str, int], input_dir: Pa
     line = source_lines.get(parameter)
     filename = "GRAINP.TXT" if input_dir else "GRAINP.TXT"
     return f"{filename} line {line}" if line else f"{filename} line not found"
+
+
+def _transport_source_location(input_dir: Path) -> str:
+    locations: list[str] = []
+    for path in sorted(input_dir.glob("DEFTRN.*")):
+        line_numbers = [
+            str(line_number)
+            for line_number, raw_line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1)
+            if raw_line.strip().upper().startswith("TRNS ") and re.search(r"\bmu\b", raw_line, flags=re.IGNORECASE)
+        ]
+        if line_numbers:
+            locations.append(f"{path.name} lines {','.join(line_numbers)}")
+    return "; ".join(locations) if locations else "DEFTRN.* TRNS records"

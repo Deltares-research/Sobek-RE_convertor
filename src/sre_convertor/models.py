@@ -104,36 +104,7 @@ class Structure:
     crest_width: float
     gate_opening_width: float | None = None
     gate_lower_edge_level: float | None = None
-
-
-@dataclass(frozen=True)
-class SreRtcController:
-    id: str
-    name: str
-    controller_type: str
-    controlled_parameter: str
-    controlled_structure_id: str | None
-    trigger_ids: tuple[str, ...]
-    observation_branch_id: str | None = None
-    observation_chainage: float | None = None
-    parameters: tuple[tuple[str, str], ...] = ()
-    tables: tuple[tuple[tuple[str, ...], ...], ...] = ()
-
-
-@dataclass(frozen=True)
-class SreRtcTrigger:
-    id: str
-    name: str
-    trigger_type: str
-    branch_id: str | None = None
-    chainage: float | None = None
-    tables: tuple[tuple[tuple[str, ...], ...], ...] = ()
-
-
-@dataclass(frozen=True)
-class SreRtcSummary:
-    controllers: tuple[SreRtcController, ...] = ()
-    triggers: tuple[SreRtcTrigger, ...] = ()
+    gate_height: float | None = None
 
 
 @dataclass(frozen=True)
@@ -172,6 +143,22 @@ class BranchTransportParameters:
 
 
 @dataclass(frozen=True)
+class TransportFormulaDefinition:
+    branch_id: str
+    formula_name: str
+    calibration_factor: float | None = None
+    options: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ActiveLayerThicknessDefinition:
+    branch_id: str
+    start_chainage: float
+    end_chainage: float
+    thickness_m: float
+
+
+@dataclass(frozen=True)
 class MorphodynamicsSummary:
     branch_count_with_grainsize: int
     has_morphology_switch: bool
@@ -184,6 +171,9 @@ class MorphodynamicsSummary:
     graded_sediment_parameters: tuple[tuple[str, str], ...] = ()
     graded_sediment_flags: tuple[str, ...] = ()
     transport_parameters: tuple[BranchTransportParameters, ...] = ()
+    transport_formulas: tuple[TransportFormulaDefinition, ...] = ()
+    active_layer_thicknesses: tuple[ActiveLayerThicknessDefinition, ...] = ()
+    active_layer_thickness_m: float | None = None
     branch_composition: tuple[tuple[str, tuple[float, ...]], ...] = ()
     underlayer_count: int | None = None
     underlayer_thickness_m: float | None = None
@@ -209,7 +199,6 @@ class SreCaseModel:
     roughness: tuple[BranchRoughness, ...]
     initial_conditions: tuple[BranchInitialCondition, ...]
     morphodynamics: MorphodynamicsSummary
-    rtc: SreRtcSummary = field(default_factory=SreRtcSummary)
 
 
 @dataclass(frozen=True)
@@ -221,7 +210,6 @@ class ConversionOptions:
     test_duration_seconds: int = 7200
     activate_morphodynamics: bool = False
     activate_rtc: bool = False
-    rtc_source_dir: Path | None = None
     create_plots: bool = False
     include_input_files: bool = False
     include_input_read_details: bool = False

@@ -1,5 +1,4 @@
 from pathlib import Path
-import json
 
 from netCDF4 import Dataset, chartostring
 import pytest
@@ -127,10 +126,10 @@ def test_convert_case_creates_requested_plots(tmp_path: Path) -> None:
 
     figure_paths = {
         output_dir / "fig" / "grid.png",
-        output_dir / "fig" / "initial_sediment_composition.png",
     }
     timeseries_paths = tuple((output_dir / "fig").glob("timeseries_*.png"))
     branch_figure_paths = tuple((output_dir / "fig").glob("initial_sediment_composition_branch_*.png"))
+    thickness_figure_paths = tuple((output_dir / "fig").glob("initial_layer_thickness_branch_*.png"))
     initial_condition_paths = tuple((output_dir / "fig").glob("initial_condition_branch_*.png"))
     friction_paths = tuple((output_dir / "fig").glob("friction_branch_*.png"))
     acal_paths = tuple((output_dir / "fig").glob("acal_branch_*.png"))
@@ -143,6 +142,10 @@ def test_convert_case_creates_requested_plots(tmp_path: Path) -> None:
     assert not (output_dir / "fig" / "timeseries_boundary_Waalds.png").exists()
     assert len(branch_figure_paths) == 7
     assert all(path in report.files_created and path.stat().st_size > 0 for path in branch_figure_paths)
+    assert len(thickness_figure_paths) == 7
+    assert all(path in report.files_created and path.stat().st_size > 0 for path in thickness_figure_paths)
+    assert not (output_dir / "fig" / "initial_sediment_composition.png").exists()
+    assert not (output_dir / "fig" / "initial_top_layer_thickness.png").exists()
     assert initial_condition_paths
     assert all(path in report.files_created and path.stat().st_size > 0 for path in initial_condition_paths)
     assert friction_paths
@@ -319,60 +322,26 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     assert "PACFAC: read at GRAINP.TXT line" in log_text
     assert "used in dflowfm/sed.sed CDryB (line" in log_text
     assert "ALLUVIAL: read at GRAINP.TXT line" in log_text
-    assert "not used in FM output" in log_text
+    assert "SRE dune-height option; GILL selects the Gill dune-height calculation" in log_text
+    assert "SRE $TRFORM MEY1 selects the special Meyer-Peter-Muller relation" in log_text
+    assert "MPMEXP parameters=1 0.4 2" in log_text
+    assert "Branch coverage: 7 $TRFORM definitions match 7 DEFTRN records" in log_text
+    assert "all DEFTRN branches use the same formula code" in log_text
     assert "-> one FM [Sediment] block per fraction" in log_text
     assert "-> [Underlayer] in dflowfm/mor.mor" in log_text
+    assert "all use 0.8 m -> one FM ThTrLyr value is used" in log_text
+    assert "$GSDEFF: read at GRAINP.TXT line" in log_text
     assert log_text.index("write_cross_section_") < log_text.index("Morphodynamics interpretation")
     assert log_text.index("write_roughness") < log_text.index("Morphodynamics interpretation")
     mor_text = (dflowfm_dir / "mor.mor").read_text(encoding="utf-8")
     assert "IUnderLyr        = 2" in mor_text
     assert "MxNULyr          = 19" in mor_text
     assert "ThUnLyr          = 5.0000000e-01" in mor_text
-    assert (dflowfm_dir / "gsd_ini_str" / "lyr20_thk.xyz").exists()
+    assert "ThTrLyr          = 8.0000000e-01" in mor_text
+    assert (dflowfm_dir / "gsd_ini_str" / "lyr01_thk.xyz").exists()
+    top_layer_thicknesses = {
+        float(line.split()[2])
+        for line in (dflowfm_dir / "gsd_ini_str" / "lyr01_thk.xyz").read_text(encoding="utf-8").splitlines()
+    }
+    assert top_layer_thicknesses == {0.5}
 
-
-@pytest.mark.integration
-def test_convert_case_can_enable_rtc_with_supplied_package(tmp_path: Path) -> None:
-    input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
-    rtc_source_dir = Path(__file__).resolve().parents[1] / "data" / "fm" / "rtc"
-    output_dir = tmp_path / "fm_case_rtc"
-
-    report = convert_case(
-        input_dir,
-        output_dir,
-        model_name="demo_case_rtc",
-        activate_rtc=True,
-        rtc_source_dir=rtc_source_dir,
-    )
-
-    dimr_text = (output_dir / "dimr_config.xml").read_text(encoding="utf-8")
-    assert (output_dir / "rtc" / "rtcDataConfig.xml").exists()
-    assert any(path.name == "rtcToolsConfig.xml" for path in report.files_created)
-    assert "<component name=\"RTC\">" in dimr_text
-    assert "<coupler name=\"flowfm_to_rtc\">" in dimr_text
-    assert "<coupler name=\"rtc_to_flowfm\">" in dimr_text
-    assert "<time>0 600 7200</time>" in dimr_text
-    assert "<sourceName>observations/LMW.Drielboven/water_level</sourceName>" in dimr_text
-    assert "<targetName>weirs/ST_Driel_zom/CrestLevel</targetName>" in dimr_text
-
-
-@pytest.mark.integration
-def test_convert_case_warns_when_rtc_requested_without_package(tmp_path: Path) -> None:
-    input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
-    output_dir = tmp_path / "fm_case_missing_rtc"
-
-    report = convert_case(input_dir, output_dir, model_name="demo_case_no_rtc", activate_rtc=True)
-
-    dimr_text = (output_dir / "dimr_config.xml").read_text(encoding="utf-8")
-    mdu_text = (output_dir / "dflowfm" / "demo_case_no_rtc.mdu").read_text(encoding="utf-8")
-    inventory_path = output_dir / "rtc_sre_inventory.json"
-    assert any("activate_rtc=True requested" in warning for warning in report.warnings)
-    assert any("Native SRE RTC CNTL/TRGR records" in warning for warning in report.warnings)
-    assert "<component name=\"RTC\">" in dimr_text
-    assert "ObsFile                           = ObservationPoints_rtc.ini" in mdu_text
-    assert (output_dir / "rtc" / "rtcToolsConfig.xml").exists()
-    assert (output_dir / "dflowfm" / "ObservationPoints_rtc.ini").exists()
-    assert inventory_path.exists()
-    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-    assert len(inventory["controllers"]) == 8
-    assert len(inventory["triggers"]) == 6

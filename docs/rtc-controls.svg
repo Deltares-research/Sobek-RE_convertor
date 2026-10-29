@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1120" style="width: 100%; height: auto" role="img" aria-labelledby="title description">
+  <title id="title">SRE real-time controls</title>
+  <desc id="description">Four structure controllers use water level from branch 99938 at chainage 34000. The low-side threshold uses less-than-or-equal so equality selects its rule. Time schedules span the simulation runtime.</desc>
+  <defs>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #203040; }
+      .title { font-size: 30px; font-weight: 700; }
+      .subtitle { font-size: 16px; fill: #506070; }
+      .card-title { font-size: 19px; font-weight: 700; }
+      .small { font-size: 13px; fill: #506070; }
+      .body { font-size: 15px; }
+      .body-bold { font-size: 15px; font-weight: 700; }
+      .observation { fill: #e8f3fb; stroke: #3478a8; stroke-width: 2; }
+      .card { fill: #ffffff; stroke: #b7c3ce; stroke-width: 1.5; }
+      .hydraulic { fill: #f0eafa; stroke: #7952a3; stroke-width: 1.5; }
+      .time { fill: #fff3dc; stroke: #bc7c13; stroke-width: 1.5; }
+      .output { fill: #e8f4eb; stroke: #43885b; stroke-width: 1.5; }
+      .callout { fill: #fff8df; stroke: #c99a28; stroke-width: 1.5; }
+      .line { fill: none; stroke: #647789; stroke-width: 1.6; }
+      .arrow { fill: none; stroke: #647789; stroke-width: 1.6; marker-end: url(#arrowhead); }
+      .divider { stroke: #d7dfe6; stroke-width: 1; }
+    </style>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#647789"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="1120" fill="#f7f9fb"/>
+  <text class="title" x="42" y="48">SRE model RTC controls</text>
+  <text class="subtitle" x="42" y="76">Hydraulic water-level triggers select the controller output for each structure.</text>
+
+  <rect class="observation" x="430" y="100" width="740" height="82" rx="10"/>
+  <text class="body-bold" x="800" y="132" text-anchor="middle">Shared water-level observation H</text>
+  <text class="body" x="800" y="157" text-anchor="middle">SRE branch 99938, chainage 34000</text>
+
+  <path class="line" d="M800 182 V212"/>
+  <path class="line" d="M215 212 H1385"/>
+  <path class="arrow" d="M215 212 V245"/>
+  <path class="arrow" d="M605 212 V245"/>
+  <path class="arrow" d="M995 212 V245"/>
+  <path class="arrow" d="M1385 212 V245"/>
+
+  <g>
+    <rect class="card" x="30" y="250" width="370" height="410" rx="10"/>
+    <text class="card-title" x="50" y="281">Driel</text>
+    <text class="small" x="50" y="302">ST_73326 - orifice - crest level</text>
+    <rect class="hydraulic" x="50" y="318" width="330" height="125" rx="8"/>
+    <text class="body-bold" x="66" y="344">H &lt;= 10</text>
+    <text class="body" x="66" y="369">CNTL 73321 - ct=1 Hydraulic</text>
+    <text class="small" x="66" y="391">Water-level / crest-level lookup</text>
+    <path class="arrow" d="M215 397 V410"/>
+    <rect class="output" x="66" y="411" width="298" height="25" rx="5"/>
+    <text class="body" x="215" y="429" text-anchor="middle">Output: crest level</text>
+
+    <rect class="time" x="50" y="458" width="330" height="125" rx="8"/>
+    <text class="body-bold" x="66" y="484">H &gt; 10</text>
+    <text class="body" x="66" y="509">CNTL 73319 - ct=0 Time</text>
+    <text class="small" x="66" y="531">Flat table value: 0 m (1985-2000)</text>
+    <path class="arrow" d="M215 537 V550"/>
+    <rect class="output" x="66" y="551" width="298" height="25" rx="5"/>
+    <text class="body" x="215" y="569" text-anchor="middle">Output: crest level</text>
+    <text class="small" x="50" y="628">The name "Driel PID" does not change ct=1.</text>
+  </g>
+
+  <g>
+    <rect class="card" x="420" y="250" width="370" height="410" rx="10"/>
+    <text class="card-title" x="440" y="281">Amero</text>
+    <text class="small" x="440" y="302">ST_78756 - orifice - crest level</text>
+    <rect class="hydraulic" x="440" y="318" width="330" height="125" rx="8"/>
+    <text class="body-bold" x="456" y="344">H &lt;= 11.4</text>
+    <text class="body" x="456" y="369">CNTL 78749 - ct=1 Hydraulic</text>
+    <text class="small" x="456" y="391">Water-level / crest-level lookup</text>
+    <path class="arrow" d="M605 397 V410"/>
+    <rect class="output" x="456" y="411" width="298" height="25" rx="5"/>
+    <text class="body" x="605" y="429" text-anchor="middle">Output: crest level</text>
+
+    <rect class="time" x="440" y="458" width="330" height="125" rx="8"/>
+    <text class="body-bold" x="456" y="484">H &gt; 11.4</text>
+    <text class="body" x="456" y="509">CNTL 78747 - ct=0 Time</text>
+    <text class="small" x="456" y="531">Flat table value: -2 m (1985-2019)</text>
+    <path class="arrow" d="M605 537 V550"/>
+    <rect class="output" x="456" y="551" width="298" height="25" rx="5"/>
+    <text class="body" x="605" y="569" text-anchor="middle">Output: crest level</text>
+    <text class="small" x="440" y="628">The time table is not a calendar trigger.</text>
+  </g>
+
+  <g>
+    <rect class="card" x="810" y="250" width="370" height="410" rx="10"/>
+    <text class="card-title" x="830" y="281">Hagestein</text>
+    <text class="small" x="830" y="302">ST_78758 - orifice - crest level</text>
+    <rect class="hydraulic" x="830" y="318" width="330" height="125" rx="8"/>
+    <text class="body-bold" x="846" y="344">H &lt;= 11.4</text>
+    <text class="body" x="846" y="369">CNTL 78750 - ct=1 Hydraulic</text>
+    <text class="small" x="846" y="391">Water-level / crest-level lookup</text>
+    <path class="arrow" d="M995 397 V410"/>
+    <rect class="output" x="846" y="411" width="298" height="25" rx="5"/>
+    <text class="body" x="995" y="429" text-anchor="middle">Output: crest level</text>
+
+    <rect class="time" x="830" y="458" width="330" height="125" rx="8"/>
+    <text class="body-bold" x="846" y="484">H &gt; 11.4</text>
+    <text class="body" x="846" y="509">CNTL 73391 - ct=0 Time</text>
+    <text class="small" x="846" y="531">Flat table value: -4 m (1985-2019)</text>
+    <path class="arrow" d="M995 537 V550"/>
+    <rect class="output" x="846" y="551" width="298" height="25" rx="5"/>
+    <text class="body" x="995" y="569" text-anchor="middle">Output: crest level</text>
+    <text class="small" x="830" y="628">The time table is not a calendar trigger.</text>
+  </g>
+
+  <g>
+    <rect class="card" x="1200" y="250" width="370" height="410" rx="10"/>
+    <text class="card-title" x="1220" y="281">Driel Omloop</text>
+    <text class="small" x="1220" y="302">ST_99477 - orifice - gate height</text>
+    <rect class="time" x="1220" y="318" width="330" height="125" rx="8"/>
+    <text class="body-bold" x="1236" y="344">H &lt;= 10</text>
+    <text class="body" x="1236" y="369">CNTL 99474 - ct=0 Time</text>
+    <text class="small" x="1236" y="391">Flat table value: 0.5 m (2000-2150)</text>
+    <path class="arrow" d="M1385 397 V410"/>
+    <rect class="output" x="1236" y="411" width="298" height="25" rx="5"/>
+    <text class="body" x="1385" y="429" text-anchor="middle">Output: gate height</text>
+
+    <rect class="time" x="1220" y="458" width="330" height="125" rx="8"/>
+    <text class="body-bold" x="1236" y="484">H &gt; 10</text>
+    <text class="body" x="1236" y="509">CNTL 99475 - ct=0 Time</text>
+    <text class="small" x="1236" y="531">Flat table value: 0 m (2000-2150)</text>
+    <path class="arrow" d="M1385 537 V550"/>
+    <rect class="output" x="1236" y="551" width="298" height="25" rx="5"/>
+    <text class="body" x="1385" y="569" text-anchor="middle">Output: gate height</text>
+    <text class="small" x="1220" y="628">The time table is not a calendar trigger.</text>
+  </g>
+
+  <rect class="callout" x="40" y="690" width="1520" height="92" rx="8"/>
+  <text class="body-bold" x="64" y="720">Threshold equality</text>
+  <text class="body" x="64" y="747">The converter maps source H &lt; threshold to D-RTC H &lt;= threshold; at equality, the low-side rule is selected.</text>
+  <text class="small" x="64" y="769">At H = 10 or 11.4, this selects the hydraulic lookup for the three main structures and the 0.5 m time rule for Driel Omloop.</text>
+
+  <rect class="card" x="40" y="805" width="1520" height="150" rx="8"/>
+  <text class="body-bold" x="64" y="836">Schedule coverage context</text>
+  <text class="body" x="64" y="864">Schedules are clipped/extended to the effective runtime using SRE continuous interpolation and endpoint values outside the source table bounds.</text>
+  <text class="body" x="64" y="890">Time tables are controller outputs, not calendar triggers. Hydraulic rules select the &quot;Hydraulic Controller&quot; table, not the auxiliary &quot;Steer Table&quot;.</text>
+  <text class="small" x="64" y="912">SRE hydraulic tables use continuous interpolation and endpoint clamping; D-RTC uses LINEAR interpolation and BLOCK extrapolation.</text>
+  <text class="small" x="64" y="936">Crest-level outputs initialize at the maximum known crest (weirs closed); Driel Omloop gate height initializes from SRE gh=0 m.</text>
+
+  <line class="divider" x1="40" y1="972" x2="1560" y2="972"/>
+  <rect class="hydraulic" x="64" y="990" width="22" height="18" rx="3"/>
+  <text class="small" x="96" y="1004">ct=1 hydraulic lookup controller</text>
+  <rect class="time" x="410" y="990" width="22" height="18" rx="3"/>
+  <text class="small" x="442" y="1004">ct=0 time-value controller</text>
+  <rect class="output" x="736" y="990" width="22" height="18" rx="3"/>
+  <text class="small" x="768" y="1004">controlled FM structure parameter</text>
+  <text class="small" x="64" y="1048">Controller type is read from CNTL ct, never inferred from its name. In particular, "Driel PID" is encoded as ct=1 (Hydraulic), not ct=3 (PID).</text>
+</svg>

@@ -54,6 +54,18 @@ def test_write_morphodynamics_files_writes_mor_and_sed(tmp_path: Path) -> None:
     assert "Type = volume fraction" in bed_comp_text
 
 
+def test_write_morphodynamics_files_maps_initial_lathic_to_ttlform(tmp_path: Path) -> None:
+    summary = MorphodynamicsSummary(
+        branch_count_with_grainsize=1,
+        has_morphology_switch=True,
+        graded_sediment_options=(("LATHIC", "INITIAL"),),
+    )
+
+    mor_path, _, _, _ = write_morphodynamics_files(tmp_path, summary)
+
+    assert "TTLForm          = 1" in mor_path.read_text(encoding="utf-8")
+
+
 def test_write_morphodynamics_files_uses_sre_sediment_density_parameters(tmp_path: Path) -> None:
     summary = MorphodynamicsSummary(
         branch_count_with_grainsize=1,

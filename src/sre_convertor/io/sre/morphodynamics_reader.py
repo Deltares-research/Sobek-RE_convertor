@@ -7,7 +7,13 @@ import re
 import shlex
 import statistics
 
-from ...models import BranchTransportParameters, LayerCompositionSample, MorphodynamicsSummary
+from ...models import (
+    ActiveLayerThicknessDefinition,
+    BranchTransportParameters,
+    LayerCompositionSample,
+    MorphodynamicsSummary,
+    TransportFormulaDefinition,
+)
 from .records import load_records
 
 
@@ -22,6 +28,8 @@ class _GrainpConfiguration:
     graded_sediment_options: tuple[tuple[str, str], ...]
     graded_sediment_parameters: tuple[tuple[str, str], ...]
     graded_sediment_flags: tuple[str, ...]
+    transport_formulas: tuple[TransportFormulaDefinition, ...]
+    active_layer_thicknesses: tuple[ActiveLayerThicknessDefinition, ...]
 
 
 def read_morphodynamics_summary(input_dir: Path) -> tuple[MorphodynamicsSummary, list[str]]:
@@ -50,6 +58,11 @@ def read_morphodynamics_summary(input_dir: Path) -> tuple[MorphodynamicsSummary,
     if branch_ids and not has_morphology_switch:
         warnings.append("MPIN grain-size initialization found, but DEFSUB does not indicate active morphology switch.")
 
+    active_thickness_values = {item.thickness_m for item in grainp_config.active_layer_thicknesses}
+    active_layer_thickness_m = next(iter(active_thickness_values)) if len(active_thickness_values) == 1 else None
+    if len(active_thickness_values) > 1:
+        warnings.append("GSDEFF specifies different active-layer thicknesses; FM ThTrLyr requires one value.")
+
     summary = MorphodynamicsSummary(
         branch_count_with_grainsize=len(branch_ids),
         has_morphology_switch=has_morphology_switch,
@@ -62,6 +75,9 @@ def read_morphodynamics_summary(input_dir: Path) -> tuple[MorphodynamicsSummary,
         graded_sediment_parameters=grainp_config.graded_sediment_parameters,
         graded_sediment_flags=grainp_config.graded_sediment_flags,
         transport_parameters=_read_transport_parameters(trns_records),
+        transport_formulas=grainp_config.transport_formulas,
+        active_layer_thicknesses=grainp_config.active_layer_thicknesses,
+        active_layer_thickness_m=active_layer_thickness_m,
         branch_composition=branch_composition,
         underlayer_count=grainp_config.underlayer_count,
         underlayer_thickness_m=grainp_config.underlayer_thickness_m,
@@ -99,7 +115,7 @@ def _read_transport_parameters(records: list) -> tuple[BranchTransportParameters
 def _read_grainp_configuration(input_dir: Path) -> _GrainpConfiguration:
     path = input_dir / "GRAINP.TXT"
     if not path.exists():
-        return _GrainpConfiguration(tuple(), tuple(), None, None, tuple(), tuple(), tuple(), tuple(), tuple())
+        return _GrainpConfiguration(tuple(), tuple(), None, None, tuple(), tuple(), tuple(), tuple(), tuple(), tuple(), tuple())
 
     branch_number_map = _read_branch_number_map(input_dir)
     lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
@@ -112,6 +128,8 @@ def _read_grainp_configuration(input_dir: Path) -> _GrainpConfiguration:
     graded_sediment_options: dict[str, str] = {}
     graded_sediment_parameters: dict[str, str] = {}
     graded_sediment_flags: set[str] = set()
+    transport_formulas: list[TransportFormulaDefinition] = []
+    active_layer_thicknesses: list[ActiveLayerThicknessDefinition] = []
     current_section: str | None = None
     current_branch_id: str | None = None
     current_chainage: float | None = None
@@ -138,6 +156,33 @@ def _read_grainp_configuration(input_dir: Path) -> _GrainpConfiguration:
             continue
 
         tokens = shlex.split(line)
+        gsdeff_match = re.match(
+            r"^\$GSDEFF\s+BRANCH\s+(\d+)\s+FROM\s+([-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?)\s+TO\s+([-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?)\s+([-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?)",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if gsdeff_match:
+            active_layer_thicknesses.append(
+                ActiveLayerThicknessDefinition(
+                    branch_id=branch_number_map.get(int(gsdeff_match.group(1)), gsdeff_match.group(1)),
+                    start_chainage=float(gsdeff_match.group(2)),
+                    end_chainage=float(gsdeff_match.group(3)),
+                    thickness_m=float(gsdeff_match.group(4)),
+                )
+            )
+            continue
+        if len(tokens) >= 5 and tokens[0].upper() == "$TRFORM" and tokens[1].upper() == "BRANCH":
+            branch_number = _to_int(tokens[2])
+            if branch_number is not None:
+                transport_formulas.append(
+                    TransportFormulaDefinition(
+                        branch_id=branch_number_map.get(branch_number, str(branch_number)),
+                        formula_name=tokens[3].upper(),
+                        calibration_factor=_to_float(tokens[4]),
+                        options=tuple(token.upper() for token in tokens[5:]),
+                    )
+                )
+            continue
         if tokens and tokens[0].startswith("$"):
             keyword = tokens[0].upper()
             current_section = keyword if keyword in {"$SEDPAR", "$MORPAR", "$GSOPT", "$GSPAR"} else None
@@ -212,6 +257,8 @@ def _read_grainp_configuration(input_dir: Path) -> _GrainpConfiguration:
         graded_sediment_options=tuple(sorted(graded_sediment_options.items())),
         graded_sediment_parameters=tuple(sorted(graded_sediment_parameters.items())),
         graded_sediment_flags=tuple(sorted(graded_sediment_flags)),
+        transport_formulas=tuple(transport_formulas),
+        active_layer_thicknesses=tuple(active_layer_thicknesses),
     )
 
 

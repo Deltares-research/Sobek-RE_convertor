@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 import shlex
 
@@ -73,9 +74,11 @@ def read_structures(input_dir: Path) -> tuple[tuple[Structure, ...], list[str]]:
 
         gate_opening_width = None
         gate_lower_edge_level = None
+        gate_height = None
         if structure_type == "orifice":
             gate_opening_width = _first_valid_float(definition_record, ["wl", "w1", "cw"], default=crest_width)
             gate_lower_edge_level = _first_valid_float(definition_record, ["zs", "z1", "cl"], default=crest_level)
+            gate_height = _first_optional_valid_float(definition_record, ["gh"])
 
         structures.append(
             Structure(
@@ -88,6 +91,7 @@ def read_structures(input_dir: Path) -> tuple[tuple[Structure, ...], list[str]]:
                 crest_width=crest_width,
                 gate_opening_width=gate_opening_width,
                 gate_lower_edge_level=gate_lower_edge_level,
+                gate_height=gate_height,
             )
         )
 
@@ -136,6 +140,14 @@ def _first_valid_float(record: RawRecord, keys: list[str], default: float) -> fl
         if value is not None and value < 1.0e9:
             return value
     return default
+
+
+def _first_optional_valid_float(record: RawRecord, keys: list[str]) -> float | None:
+    for key in keys:
+        value = _as_float(record.attrs.get(key), None)
+        if value is not None and math.isfinite(value) and abs(value) < 1.0e9:
+            return value
+    return None
 
 
 def _as_float(value: str | None, default: float | None) -> float | None:

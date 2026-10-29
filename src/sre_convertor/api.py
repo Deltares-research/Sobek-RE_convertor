@@ -39,7 +39,6 @@ def convert_case(
     test_duration_seconds: int = 7200,
     activate_morphodynamics: bool = False,
     activate_rtc: bool = False,
-    rtc_source_dir: str | Path | None = None,
     create_plots: bool = False,
     include_input_files: bool = False,
     include_input_read_details: bool = False,
@@ -55,7 +54,6 @@ def convert_case(
         create_plots=create_plots,
         activate_morphodynamics=activate_morphodynamics,
         activate_rtc=activate_rtc,
-        rtc_source_dir=Path(rtc_source_dir) if rtc_source_dir is not None else None,
         include_input_files=include_input_files,
         include_input_read_details=include_input_read_details,
     )
