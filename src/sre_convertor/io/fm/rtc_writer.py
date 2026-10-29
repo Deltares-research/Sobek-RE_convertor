@@ -34,6 +34,7 @@ XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance"
 RTC_TIMESTEP_SECONDS = 600
 OBSERVATION_FILE_NAME = "rtc_observations.xyn"
 RTC_SCHEMA_DIRECTORY = Path(__file__).resolve().parents[4] / "data" / "fm" / "rtc"
+MAX_TIME_SCHEDULE_EVENTS = 1_000_000
 
 
 class _Identified(Protocol):
@@ -497,7 +498,61 @@ def _compile_time_schedule(
         ),
         (runtime_stop, _schedule_value(parsed_rows, runtime_stop)),
     ]
-    return tuple(schedule_rows), "LINEAR", max(value for _, value in parsed_rows)
+    regular_schedule = _regularize_time_schedule(
+        tuple(schedule_rows),
+        controller.id,
+        errors,
+    )
+    if regular_schedule is None:
+        return (), None, None
+    return regular_schedule, "LINEAR", max(value for _, value in parsed_rows)
+
+
+def _regularize_time_schedule(
+    rows: tuple[tuple[datetime, float], ...],
+    controller_id: str,
+    errors: list[str],
+) -> tuple[tuple[datetime, float], ...] | None:
+    offsets: list[int] = []
+    start_time = rows[0][0]
+    for timestamp, _ in rows:
+        offset = (timestamp - start_time).total_seconds()
+        if not offset.is_integer():
+            errors.append(
+                f"Time controller {controller_id} has a schedule timestamp with "
+                "sub-second precision, which cannot be represented by the RTC "
+                "time-series format."
+            )
+            return None
+        offsets.append(int(offset))
+
+    timestep_seconds = 0
+    for offset in offsets[1:]:
+        timestep_seconds = math.gcd(timestep_seconds, offset)
+    if timestep_seconds <= 0:
+        errors.append(
+            f"Time controller {controller_id} has no positive equidistant schedule "
+            "step."
+        )
+        return None
+
+    duration_seconds = offsets[-1]
+    event_count = duration_seconds // timestep_seconds + 1
+    if event_count > MAX_TIME_SCHEDULE_EVENTS:
+        errors.append(
+            f"Time controller {controller_id} requires {event_count:,} equidistant "
+            "schedule events because the RTC runtime does not support "
+            "nonequidistant time series; the schedule would exceed the "
+            f"{MAX_TIME_SCHEDULE_EVENTS:,}-event safety limit."
+        )
+        return None
+
+    source_rows = list(rows)
+    regularized_rows: list[tuple[datetime, float]] = []
+    for index in range(event_count):
+        timestamp = start_time + timedelta(seconds=index * timestep_seconds)
+        regularized_rows.append((timestamp, _schedule_value(source_rows, timestamp)))
+    return tuple(regularized_rows)
 
 
 def _schedule_value(
@@ -915,7 +970,7 @@ def _build_time_schedule_import(outputs: tuple[_OutputPlan, ...]) -> bytes:
         ET.SubElement(
             header,
             _tag(PI_NAMESPACE, "timeStep"),
-            {"unit": "nonequidistant"},
+            _time_step_attributes(_schedule_step_seconds(controller.schedule_rows)),
         )
         ET.SubElement(header, _tag(PI_NAMESPACE, "startDate"), _date_time_attributes(
             controller.schedule_rows[0][0]
@@ -956,6 +1011,38 @@ def _date_time_attributes(timestamp: datetime) -> dict[str, str]:
         "date": timestamp.strftime("%Y-%m-%d"),
         "time": timestamp.strftime("%H:%M:%S"),
     }
+
+
+def _schedule_step_seconds(
+    rows: tuple[tuple[datetime, float], ...],
+) -> int:
+    if len(rows) < 2:
+        raise ValueError("A time schedule must contain at least two rows.")
+    step_seconds = int((rows[1][0] - rows[0][0]).total_seconds())
+    if step_seconds <= 0 or any(
+        timestamp
+        != rows[0][0] + timedelta(seconds=index * step_seconds)
+        for index, (timestamp, _) in enumerate(rows)
+    ):
+        raise ValueError("Time schedule rows must be equidistant.")
+    return step_seconds
+
+
+def _time_step_attributes(timestep_seconds: int) -> dict[str, str]:
+    for unit, unit_seconds in (
+        ("week", 7 * 24 * 60 * 60),
+        ("day", 24 * 60 * 60),
+        ("hour", 60 * 60),
+        ("minute", 60),
+        ("second", 1),
+    ):
+        if timestep_seconds % unit_seconds == 0:
+            return {
+                "unit": unit,
+                "multiplier": str(timestep_seconds // unit_seconds),
+                "divider": "1",
+            }
+    raise ValueError(f"Unsupported time schedule step {timestep_seconds} seconds.")
 
 
 def _append_time_absolute_rule(

@@ -80,6 +80,11 @@ holds the first/last table value outside its bounds; the converter reproduces
 that policy at schedule boundaries and configures D-RTC hydraulic lookup
 tables with `LINEAR` interpolation and `BLOCK` extrapolation (which returns the
 nearest endpoint value in the [Delft3D lookup implementation](https://github.com/Deltares/Delft3D/blob/3fed73cbc4dacde4ce51b52f3d92035f45534d0e/src/engines_gpl/fbc/packages/FBCTools/src/utilities/lookupTableConverter.cpp)).
+Time-controller schedules are emitted as equidistant PI time series because
+the supported RTC-Tools runtime does not accept `nonequidistant` series. The
+converter retains every source schedule knot and linearly interpolates between
+knots when creating the equidistant series; schedules that would exceed the
+event safety limit are rejected before an RTC package is written.
 
 Hydraulic SRE `<` triggers are intentionally emitted as D-RTC `LessEqual`, so
 the lower-side rule wins at an exact threshold; `>` remains `Greater`. This

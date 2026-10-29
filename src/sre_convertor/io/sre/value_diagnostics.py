@@ -4,9 +4,14 @@ from pathlib import Path
 
 from ...models import SreCaseModel
 from .records import RawRecord, load_records
+from .rtc_reader import SreRtcSummary
 
 
-def collect_value_read_details(input_dir: Path, case: SreCaseModel) -> tuple[str, ...]:
+def collect_value_read_details(
+    input_dir: Path,
+    case: SreCaseModel,
+    rtc_summary: SreRtcSummary | None = None,
+) -> tuple[str, ...]:
     records = _load_all_records(input_dir)
     details: list[str] = []
 
@@ -74,12 +79,35 @@ def collect_value_read_details(input_dir: Path, case: SreCaseModel) -> tuple[str
     details.append(_detail("Runtime", (f"refdate={case.runtime.refdate.isoformat()}", f"tstart={case.runtime.tstart_seconds}", f"tstop={case.runtime.tstop_seconds}", _source(_first_record(records, "FLTM")))))
     morph = case.morphodynamics
     details.append(_detail("Morphodynamics", (f"morphology_switch={morph.has_morphology_switch}", f"branches_with_grainsize={morph.branch_count_with_grainsize}", f"grain_samples={morph.grain_size_sample_count}", f"d50={morph.representative_d50_m}", f"sediment_fractions={_values(morph.sediment_fractions_d50_m)}", _source(_first_record(records, "MPIN", "SBST", "TRNS")))))
-    for controller in case.rtc.controllers:
-        record = _find_record(records, "CONT", controller.id)
-        details.append(_detail("RTC controller", (f"id={controller.id!r}", f"name={controller.name!r}", f"type={controller.controller_type!r}", f"parameter={controller.controlled_parameter!r}", f"triggers={controller.trigger_ids}", _source(record))))
-    for trigger in case.rtc.triggers:
-        record = _find_record(records, "TRIG", trigger.id)
-        details.append(_detail("RTC trigger", (f"id={trigger.id!r}", f"name={trigger.name!r}", f"type={trigger.trigger_type!r}", f"branch={trigger.branch_id!r}", f"chainage={trigger.chainage}", _source(record))))
+    if rtc_summary is not None:
+        for controller in rtc_summary.controllers:
+            details.append(
+                _detail(
+                    "RTC controller",
+                    (
+                        f"id={controller.id!r}",
+                        f"name={controller.name!r}",
+                        f"type={controller.controller_type!r}",
+                        f"parameter={controller.controlled_parameter!r}",
+                        f"triggers={controller.active_trigger_ids}",
+                        _rtc_source(controller.source_file, controller.source_line),
+                    ),
+                )
+            )
+        for trigger in rtc_summary.triggers:
+            details.append(
+                _detail(
+                    "RTC trigger",
+                    (
+                        f"id={trigger.id!r}",
+                        f"name={trigger.name!r}",
+                        f"type={trigger.trigger_type!r}",
+                        f"branch={trigger.branch_id!r}",
+                        f"chainage={trigger.chainage}",
+                        _rtc_source(trigger.source_file, trigger.source_line),
+                    ),
+                )
+            )
 
     return tuple(details)
 
@@ -117,6 +145,10 @@ def _source(record: RawRecord | None) -> str:
     if record is None:
         return "source=not matched"
     return f"source={record.source_file.name} lines={record.source_line_start}-{record.source_line_end}"
+
+
+def _rtc_source(source_file: Path, source_line: int) -> str:
+    return f"source={source_file.name} lines={source_line}-{source_line}"
 
 
 def _values(values: tuple[float, ...]) -> str:

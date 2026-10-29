@@ -67,6 +67,17 @@ def test_compile_and_write_sre_rtc_package_for_supported_time_control(
     assert observation_path.read_text(encoding="utf-8") == (
         "50.000 0.000 rtc_obs_bB1_s50\n"
     )
+    schedule = ET.parse(schedule_path).getroot()
+    time_step = schedule.find(
+        "./p:series/p:header/p:timeStep",
+        {"p": "http://www.wldelft.nl/fews/PI"},
+    )
+    assert time_step is not None
+    assert time_step.attrib == {
+        "unit": "minute",
+        "multiplier": "10",
+        "divider": "1",
+    }
 
     tools = ET.parse(tools_path).getroot()
     time_absolute = tools.find("./f:rules/f:rule/f:timeAbsolute", _FEWS)
@@ -265,9 +276,21 @@ def test_compile_sre_rtc_extends_and_preserves_time_schedule() -> None:
         dict(compilation.file_contents)["xml_dir/time_schedule_import.xml"]
     )
     events = schedule.findall("./p:series/p:event", {"p": "http://www.wldelft.nl/fews/PI"})
-    assert [(event.attrib["time"], event.attrib["value"]) for event in events] == [
+    assert schedule.find(
+        "./p:series/p:header/p:timeStep",
+        {"p": "http://www.wldelft.nl/fews/PI"},
+    ).attrib == {
+        "unit": "minute",
+        "multiplier": "2",
+        "divider": "1",
+    }
+    assert [
+        (event.attrib["time"], event.attrib["value"]) for event in events
+    ] == [
         ("00:00:00", "1"),
         ("00:02:00", "1"),
+        ("00:04:00", "2.33333333333333"),
+        ("00:06:00", "3.66666666666667"),
         ("00:08:00", "5"),
         ("00:10:00", "7"),
     ]

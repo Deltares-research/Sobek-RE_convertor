@@ -78,6 +78,7 @@ def convert_network_case(
     warnings.extend(_validate_network(case_model.network))
 
     rtc_compilation = None
+    rtc_summary = None
     if options.activate_rtc:
         rtc_summary, rtc_warnings = read_sre_rtc(input_dir)
         warnings.extend(rtc_warnings)
@@ -272,7 +273,7 @@ def convert_network_case(
         warnings=warnings,
         network_diagnostics=case_model.network.diagnostics,
         input_diagnostics=collect_input_diagnostics(input_dir),
-        value_read_details=collect_value_read_details(input_dir, case_model),
+        value_read_details=collect_value_read_details(input_dir, case_model, rtc_summary),
     )
     if options.create_plots:
         report.files_created.extend(
