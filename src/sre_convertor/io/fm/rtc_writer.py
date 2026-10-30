@@ -720,27 +720,31 @@ def _actuator_target(
         )
         return None
     if controller.controlled_parameter is SreRtcControlledParameter.CREST_LEVEL:
-        if structure.structure_type not in {"weir", "orifice"}:
+        if structure.structure_type not in {"weir", "orifice", "generalstructure"}:
             errors.append(
                 f"Controller {controller.id} controls crest level on unsupported "
                 f"structure type {structure.structure_type!r} ({structure.id})."
             )
             return None
-        group = "weirs" if structure.structure_type == "weir" else "orifices"
+        group = {
+            "weir": "weirs",
+            "orifice": "orifices",
+            "generalstructure": "generalstructures",
+        }[structure.structure_type]
         return (
             f"{group}/{structure.name}/crestlevel",
             "crestlevel",
             "crest_level",
         )
     if controller.controlled_parameter is SreRtcControlledParameter.GATE_HEIGHT:
-        if structure.structure_type != "orifice":
+        if structure.structure_type != "generalstructure":
             errors.append(
                 f"Controller {controller.id} controls gate height on unsupported "
                 f"structure type {structure.structure_type!r} ({structure.id})."
             )
             return None
         return (
-            f"orifices/{structure.name}/gateheight",
+            f"generalstructures/{structure.name}/GateHeight",
             "gateheight",
             "gate_height",
         )

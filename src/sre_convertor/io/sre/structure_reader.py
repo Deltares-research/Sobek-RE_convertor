@@ -70,14 +70,67 @@ def read_structures(input_dir: Path) -> tuple[tuple[Structure, ...], list[str]]:
 
         structure_type = _map_structure_type(definition_record)
         crest_level = _first_valid_float(definition_record, ["zs", "cl", "z1"], default=0.0)
-        crest_width = _first_valid_float(definition_record, ["cw", "w1", "wl", "wr"], default=1.0)
+        crest_width = _first_valid_float(
+            definition_record,
+            ["ws", "cw", "w1", "wl", "wr"]
+            if structure_type == "generalstructure"
+            else ["cw", "w1", "wl", "wr"],
+            default=1.0,
+        )
 
         gate_opening_width = None
         gate_lower_edge_level = None
         gate_height = None
-        if structure_type == "orifice":
-            gate_opening_width = _first_valid_float(definition_record, ["wl", "w1", "cw"], default=crest_width)
-            gate_lower_edge_level = _first_valid_float(definition_record, ["zs", "z1", "cl"], default=crest_level)
+        upstream1_width = None
+        upstream1_level = None
+        upstream2_width = None
+        upstream2_level = None
+        downstream1_width = None
+        downstream1_level = None
+        downstream2_width = None
+        downstream2_level = None
+        if structure_type == "generalstructure":
+            upstream1_width = _first_valid_float(
+                definition_record,
+                ["w1"],
+                default=crest_width,
+            )
+            upstream1_level = _first_valid_float(
+                definition_record,
+                ["z1"],
+                default=crest_level,
+            )
+            upstream2_width = _first_valid_float(
+                definition_record,
+                ["wl"],
+                default=crest_width,
+            )
+            upstream2_level = _first_valid_float(
+                definition_record,
+                ["zl"],
+                default=crest_level,
+            )
+            downstream1_width = _first_valid_float(
+                definition_record,
+                ["wr"],
+                default=crest_width,
+            )
+            downstream1_level = _first_valid_float(
+                definition_record,
+                ["zr"],
+                default=crest_level,
+            )
+            downstream2_width = _first_valid_float(
+                definition_record,
+                ["w2"],
+                default=crest_width,
+            )
+            downstream2_level = _first_valid_float(
+                definition_record,
+                ["z2"],
+                default=crest_level,
+            )
+            gate_lower_edge_level = crest_level
             gate_height = _first_optional_valid_float(definition_record, ["gh"])
 
         structures.append(
@@ -92,6 +145,14 @@ def read_structures(input_dir: Path) -> tuple[tuple[Structure, ...], list[str]]:
                 gate_opening_width=gate_opening_width,
                 gate_lower_edge_level=gate_lower_edge_level,
                 gate_height=gate_height,
+                upstream1_width=upstream1_width,
+                upstream1_level=upstream1_level,
+                upstream2_width=upstream2_width,
+                upstream2_level=upstream2_level,
+                downstream1_width=downstream1_width,
+                downstream1_level=downstream1_level,
+                downstream2_width=downstream2_width,
+                downstream2_level=downstream2_level,
             )
         )
 
@@ -130,7 +191,7 @@ def _match_compound_location(
 def _map_structure_type(definition_record: RawRecord) -> str:
     ty = definition_record.attrs.get("ty")
     if ty == "2":
-        return "orifice"
+        return "generalstructure"
     return "weir"
 
 

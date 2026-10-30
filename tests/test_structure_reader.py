@@ -27,7 +27,9 @@ def test_read_structures_maps_via_stcm_and_ignores_aux_stru_records(tmp_path: Pa
 
     # Structure type/shape definition.
     (tmp_path / "DEFSTR.3").write_text(
-        "STDS id '300' nm 'Driel_zom_gen' ty 2 w1 102 wl 95 zs 2.7 gh 0 stds\n",
+        "STDS id '300' nm 'Driel_zom_gen' ty 2 "
+        "w1 102 wl 95 ws 90 wr 95 w2 102 "
+        "z1 2.26 zl 2.36 zs 2.7 zr 2.16 z2 2.06 gh 0 stds\n",
         encoding="utf-8",
     )
 
@@ -53,7 +55,16 @@ def test_read_structures_maps_via_stcm_and_ignores_aux_stru_records(tmp_path: Pa
     assert structure.id == "ST_100"
     assert structure.branch_id == "7262"
     assert structure.chainage == 13000.0
-    assert structure.structure_type == "orifice"
+    assert structure.structure_type == "generalstructure"
+    assert structure.crest_width == 90.0
+    assert structure.upstream1_width == 102.0
+    assert structure.upstream1_level == 2.26
+    assert structure.upstream2_width == 95.0
+    assert structure.upstream2_level == 2.36
+    assert structure.downstream1_width == 95.0
+    assert structure.downstream1_level == 2.16
+    assert structure.downstream2_width == 102.0
+    assert structure.downstream2_level == 2.06
     assert structure.gate_height == 0.0
 
 

@@ -43,7 +43,7 @@
   <g>
     <rect class="card" x="30" y="250" width="370" height="410" rx="10"/>
     <text class="card-title" x="50" y="281">Driel</text>
-    <text class="small" x="50" y="302">ST_73326 - orifice - crest level</text>
+    <text class="small" x="50" y="302">ST_73326 - generalstructure - crest level</text>
     <rect class="hydraulic" x="50" y="318" width="330" height="125" rx="8"/>
     <text class="body-bold" x="66" y="344">H &lt;= 10</text>
     <text class="body" x="66" y="369">CNTL 73321 - ct=1 Hydraulic</text>
@@ -65,7 +65,7 @@
   <g>
     <rect class="card" x="420" y="250" width="370" height="410" rx="10"/>
     <text class="card-title" x="440" y="281">Amero</text>
-    <text class="small" x="440" y="302">ST_78756 - orifice - crest level</text>
+    <text class="small" x="440" y="302">ST_78756 - generalstructure - crest level</text>
     <rect class="hydraulic" x="440" y="318" width="330" height="125" rx="8"/>
     <text class="body-bold" x="456" y="344">H &lt;= 11.4</text>
     <text class="body" x="456" y="369">CNTL 78749 - ct=1 Hydraulic</text>
@@ -87,7 +87,7 @@
   <g>
     <rect class="card" x="810" y="250" width="370" height="410" rx="10"/>
     <text class="card-title" x="830" y="281">Hagestein</text>
-    <text class="small" x="830" y="302">ST_78758 - orifice - crest level</text>
+    <text class="small" x="830" y="302">ST_78758 - generalstructure - crest level</text>
     <rect class="hydraulic" x="830" y="318" width="330" height="125" rx="8"/>
     <text class="body-bold" x="846" y="344">H &lt;= 11.4</text>
     <text class="body" x="846" y="369">CNTL 78750 - ct=1 Hydraulic</text>
@@ -109,7 +109,7 @@
   <g>
     <rect class="card" x="1200" y="250" width="370" height="410" rx="10"/>
     <text class="card-title" x="1220" y="281">Driel Omloop</text>
-    <text class="small" x="1220" y="302">ST_99477 - orifice - gate height</text>
+    <text class="small" x="1220" y="302">ST_99477 - generalstructure - gate height</text>
     <rect class="time" x="1220" y="318" width="330" height="125" rx="8"/>
     <text class="body-bold" x="1236" y="344">H &lt;= 10</text>
     <text class="body" x="1236" y="369">CNTL 99474 - ct=0 Time</text>

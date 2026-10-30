@@ -245,6 +245,19 @@ def test_activate_rtc_converts_bundled_sre_controls(
     assert "LessEqual" in (output_dir / "rtc" / "xml_dir" / "rtcToolsConfig.xml").read_text(
         encoding="utf-8"
     )
+    dimr_config = (output_dir / "dimr_config.xml").read_text(encoding="utf-8")
+    assert "generalstructures/Driel Omloop/GateHeight" in dimr_config
+    assert "orifices/Driel Omloop/gateheight" not in dimr_config
+    structure_file = (output_dir / "dflowfm" / "struct.ini").read_text(encoding="utf-8")
+    assert "type                  = generalstructure" in structure_file
+    assert "upstream1Width         = 25.000" in structure_file
+    assert "gateHeight             = 1.0e10" in structure_file
+    log_text = (output_dir / "conversion.log").read_text(encoding="utf-8")
+    assert "SRE STDS ty=2 identifies a General Structure and is converted to D-Flow FM generalstructure." in log_text
+    assert "ca=0" in log_text
+    assert "controlled_variable=crest level" in log_text
+    assert "ca=2" in log_text
+    assert "controlled_variable=gate height" in log_text
     assert (output_dir / "rtc" / "xml_dir" / "state_import.xml").exists()
     state = ET.parse(
         output_dir / "rtc" / "xml_dir" / "state_import.xml"

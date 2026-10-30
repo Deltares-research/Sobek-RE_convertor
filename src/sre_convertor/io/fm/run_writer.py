@@ -3,6 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 
+DEFAULT_RUN_DIMR_PATH = (
+    r"c:\checkouts\sc_fm_trunk\install_fm-suite_release\x64\bin\run_dimr.bat"
+)
+
+
 def write_run_dimr_bat(output_dir: Path, dimr_config_name: str = "dimr_config.xml") -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / "run_dimr.bat"
@@ -12,7 +17,7 @@ def write_run_dimr_bat(output_dir: Path, dimr_config_name: str = "dimr_config.xm
             "@echo off",
             "setlocal",
             "",
-            "set RUN_DIMR=c:\\checkouts\\sc_fm_trunk\\install_fm-suite_release\\bin\\run_dimr.bat",
+            f"set RUN_DIMR={DEFAULT_RUN_DIMR_PATH}",
             "",
             "if not exist \"%RUN_DIMR%\" (",
             "  echo Could not find run_dimr.bat at %RUN_DIMR%",

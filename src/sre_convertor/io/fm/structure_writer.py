@@ -33,7 +33,33 @@ def write_structures(
             ]
         )
 
-        if structure.structure_type == "orifice":
+        if structure.structure_type == "generalstructure":
+            gate_height = structure.gate_height
+            gate_height_text = (
+                f"{gate_height:.3f}"
+                if gate_height is not None and gate_height > 0
+                else "1.0e10"
+            )
+            lines.extend(
+                [
+                    "    allowedFlowdir         = both",
+                    f"    upstream1Width         = {_value_or_default(structure.upstream1_width, structure.crest_width):.3f}",
+                    f"    upstream1Level         = {_value_or_default(structure.upstream1_level, structure.crest_level):.3f}",
+                    f"    upstream2Width         = {_value_or_default(structure.upstream2_width, structure.crest_width):.3f}",
+                    f"    upstream2Level         = {_value_or_default(structure.upstream2_level, structure.crest_level):.3f}",
+                    f"    crestLength            = 0.000",
+                    f"    downstream1Width       = {_value_or_default(structure.downstream1_width, structure.crest_width):.3f}",
+                    f"    downstream1Level       = {_value_or_default(structure.downstream1_level, structure.crest_level):.3f}",
+                    f"    downstream2Width       = {_value_or_default(structure.downstream2_width, structure.crest_width):.3f}",
+                    f"    downstream2Level       = {_value_or_default(structure.downstream2_level, structure.crest_level):.3f}",
+                    f"    gateLowerEdgeLevel     = {_value_or_default(structure.gate_lower_edge_level, structure.crest_level):.3f}",
+                    f"    gateHeight             = {gate_height_text}",
+                    f"    gateOpeningWidth       = {_value_or_default(structure.gate_opening_width, 0.0):.3f}",
+                    "    gateOpeningHorizontalDirection = symmetric",
+                    "    useVelocityHeight     = true",
+                ]
+            )
+        elif structure.structure_type == "orifice":
             lines.extend(
                 [
                     "    allowedFlowDir        = both",
@@ -51,3 +77,7 @@ def write_structures(
         )
 
     target_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _value_or_default(value: float | None, default: float) -> float:
+    return default if value is None else value

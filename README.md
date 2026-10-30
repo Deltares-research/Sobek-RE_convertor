@@ -85,6 +85,32 @@ the supported RTC-Tools runtime does not accept `nonequidistant` series. The
 converter retains every source schedule knot and linearly interpolates between
 knots when creating the equidistant series; schedules that would exceed the
 event safety limit are rejected before an RTC package is written.
+SRE `ty=2` structures are emitted as D-Flow FM `generalstructure` entries,
+because `GateHeight` is a supported RTC quantity for the
+`generalstructures/<id>` group, not for `orifices/<id>`. The generated
+GeneralStructure includes the source widths and levels, `gateLowerEdgeLevel`,
+`gateHeight`, and `gateOpeningWidth` inputs required by D-Flow FM.
+
+### SRE structure and RTC code mapping
+
+The SRE `ty` value in an `STDS` record identifies the hydraulic structure
+type. In particular, `ty=2` means **General Structure** in SRE. It can
+represent weir or gate flow depending on its geometry and flow conditions.
+The converter maps this source type to a D-Flow FM `generalstructure`.
+
+The `ca` value in a `CNTL` record identifies the controlled variable:
+
+| SRE code | Controlled variable |
+|---|---|
+| `ca=0` | Crest level |
+| `ca=1` | Crest width |
+| `ca=2` | Gate height |
+
+Therefore, `ca=2` controls **gate height**, not crest level; crest-level
+control is encoded as `ca=0`. In the bundled test SRE model, six controllers
+control crest level (`ca=0`) at Driel, Amero, and Hagestein, and two
+controllers control gate height (`ca=2`) at Driel Omloop. No controller uses
+`ca=1`.
 
 Hydraulic SRE `<` triggers are intentionally emitted as D-RTC `LessEqual`, so
 the lower-side rule wins at an exact threshold; `>` remains `Greater`. This
@@ -205,6 +231,9 @@ report = convert_case(
 ```
 
 Runtime success validation:
+
+The generated `run_dimr.bat` invokes
+`c:\checkouts\sc_fm_trunk\install_fm-suite_release\x64\bin\run_dimr.bat`.
 
 ```python
 from sre_convertor import run_and_validate_conversion, validate_conversion_success

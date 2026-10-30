@@ -146,6 +146,18 @@ def write_conversion_log(
             ]
         )
 
+    if not network_only:
+        lines.extend(
+            [
+                "",
+                "SRE structure and RTC code interpretation",
+                "-----------------------------------------",
+                "- SRE STDS ty=2 identifies a General Structure and is converted to D-Flow FM generalstructure.",
+                "- SRE CNTL ca=0 controls crest level; ca=1 controls crest width; ca=2 controls gate height.",
+                "- Important: ca=2 is gate-height control; crest-level control is ca=0.",
+            ]
+        )
+
     if options.include_input_read_details:
         lines.extend(["", *_input_read_lines(report)])
     lines.extend(

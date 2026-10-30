@@ -73,8 +73,28 @@ def collect_value_read_details(
         record = _find_record(records, "FLIN", initial.branch_id, attribute="ci")
         details.append(_detail("Initial condition", (f"branch={initial.branch_id!r}", f"chainage={initial.chainage:g}", f"water_level={initial.water_level:g}", _source(record))))
     for structure in case.structures:
-        record = _find_record(records, "STRU", structure.id)
-        details.append(_detail("Structure", (f"id={structure.id!r}", f"name={structure.name!r}", f"type={structure.structure_type!r}", f"branch={structure.branch_id!r}", f"chainage={structure.chainage:g}", f"crest_level={structure.crest_level:g}", f"crest_width={structure.crest_width:g}", _source(record))))
+        definition_record = _find_structure_definition_record(records, structure.id)
+        sre_type = (
+            definition_record.attrs.get("ty", "not matched")
+            if definition_record is not None
+            else "not matched"
+        )
+        details.append(
+            _detail(
+                "Structure",
+                (
+                    f"id={structure.id!r}",
+                    f"name={structure.name!r}",
+                    f"sre_ty={sre_type!r}",
+                    f"converted_type={structure.structure_type!r}",
+                    f"branch={structure.branch_id!r}",
+                    f"chainage={structure.chainage:g}",
+                    f"crest_level={structure.crest_level:g}",
+                    f"crest_width={structure.crest_width:g}",
+                    _source(definition_record),
+                ),
+            )
+        )
 
     details.append(_detail("Runtime", (f"refdate={case.runtime.refdate.isoformat()}", f"tstart={case.runtime.tstart_seconds}", f"tstop={case.runtime.tstop_seconds}", _source(_first_record(records, "FLTM")))))
     morph = case.morphodynamics
@@ -88,7 +108,10 @@ def collect_value_read_details(
                         f"id={controller.id!r}",
                         f"name={controller.name!r}",
                         f"type={controller.controller_type!r}",
+                        f"ca={controller.parameter_code}",
+                        f"controlled_variable={controller.controlled_parameter.name.lower().replace('_', ' ')}",
                         f"parameter={controller.controlled_parameter!r}",
+                        f"structure={controller.controlled_structure_id!r}",
                         f"triggers={controller.active_trigger_ids}",
                         _rtc_source(controller.source_file, controller.source_line),
                     ),
@@ -124,6 +147,26 @@ def _load_all_records(input_dir: Path) -> list[RawRecord]:
 
 def _find_record(records: list[RawRecord], key: str, value: str, attribute: str = "id") -> RawRecord | None:
     return next((record for record in records if record.key == key and record.attrs.get(attribute) == value), None)
+
+
+def _find_structure_definition_record(records: list[RawRecord], structure_id: str) -> RawRecord | None:
+    source_structure_id = structure_id[3:] if structure_id.startswith("ST_") else structure_id
+    location = next(
+        (
+            record
+            for record in records
+            if record.key == "STRU"
+            and record.attrs.get("id") == source_structure_id
+            and "dd" in record.attrs
+        ),
+        None,
+    )
+    if location is None:
+        return None
+    definition_id = location.attrs.get("dd")
+    if definition_id is None:
+        return None
+    return _find_record(records, "STDS", definition_id)
 
 
 def _find_series_record(records: list[RawRecord], keys: set[str], value: str) -> RawRecord | None:

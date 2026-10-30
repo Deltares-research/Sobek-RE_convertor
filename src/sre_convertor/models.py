@@ -105,6 +105,14 @@ class Structure:
     gate_opening_width: float | None = None
     gate_lower_edge_level: float | None = None
     gate_height: float | None = None
+    upstream1_width: float | None = None
+    upstream1_level: float | None = None
+    upstream2_width: float | None = None
+    upstream2_level: float | None = None
+    downstream1_width: float | None = None
+    downstream1_level: float | None = None
+    downstream2_width: float | None = None
+    downstream2_level: float | None = None
 
 
 @dataclass(frozen=True)

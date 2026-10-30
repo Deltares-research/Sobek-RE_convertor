@@ -178,6 +178,10 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "activate_rtc = False" in log_text
     assert "include_input_files = False" in log_text
     assert "include_input_read_details = False" in log_text
+    assert "SRE structure and RTC code interpretation" in log_text
+    assert "SRE STDS ty=2 identifies a General Structure and is converted to D-Flow FM generalstructure." in log_text
+    assert "SRE CNTL ca=0 controls crest level; ca=1 controls crest width; ca=2 controls gate height." in log_text
+    assert "Important: ca=2 is gate-height control; crest-level control is ca=0." in log_text
     assert "DEFTOP.1" in log_text
     assert "Input files discovered" not in log_text
     assert "read_cross_sections" in log_text
@@ -215,6 +219,8 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "section='Floodplain 2'" in log_text
     assert "initial condition branch=" in log_text
     assert "structure id=" in log_text
+    assert "sre_ty='2'" in log_text
+    assert "converted_type='generalstructure'" in log_text
     assert "DEFTOP source records:" in log_text
     assert "Grid connectivity:" in log_text
     assert "Generated grid points:" in log_text
@@ -344,4 +350,3 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
         for line in (dflowfm_dir / "gsd_ini_str" / "lyr01_thk.xyz").read_text(encoding="utf-8").splitlines()
     }
     assert top_layer_thicknesses == {0.5}
-
