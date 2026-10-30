@@ -407,17 +407,12 @@ def _extract_branch_grain_size_samples(mpin_records: list) -> dict[str, list[flo
 
 
 def _sample_from_row(row: tuple[str, ...]) -> float | None:
-    if len(row) < 2:
+    d50_column = 5
+    if len(row) <= d50_column:
         return None
 
-    candidates = [_to_grainsize(token) for token in row[1:]]
-    clean = [value for value in candidates if value is not None]
-    if not clean:
-        return None
-
-    # MPIN rows contain multiple grain-size descriptors; use the smallest
-    # valid class-scale value as a stable D50 proxy.
-    return min(clean)
+    # MPIN rows contain D35, Dm, D50, and D90; use the D50 column only.
+    return _to_grainsize(row[d50_column])
 
 
 def _to_grainsize(raw: str) -> float | None:

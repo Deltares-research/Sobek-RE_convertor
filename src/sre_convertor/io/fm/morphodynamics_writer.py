@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 
 from ...models import CrossSectionLocation, LayerCompositionSample, MorphodynamicsSummary, NetworkModel
+from ..sre.records import load_records
 
 
 COMPOSITION_FILE_NAME = "mini.ini"
@@ -40,7 +41,7 @@ def write_morphodynamics_files(
     transport_layer_thickness_m = summary.active_layer_thickness_m or 1.0
     max_underlayers = max(layer_count - 1, 1)
     underlayer_type = 2 if layer_count > 1 else 1
-    ttl_form = _ttl_form(summary)
+    ttl_form = 1
     sediment_parameter_values = _values_by_key(summary.sediment_parameters)
     relative_density = _float_value(sediment_parameter_values, "RELDEN", 1.65)
     porosity = _float_value(sediment_parameter_values, "PACFAC", 0.4)
@@ -195,13 +196,6 @@ def _chainage_to_xy(network: NetworkModel, branch_id: str, chainage: float) -> t
     return x, y
 
 
-def _ttl_form(summary: MorphodynamicsSummary) -> int:
-    lathic = dict(summary.graded_sediment_options).get("LATHIC", "").upper()
-    if lathic == "INITIAL":
-        return 1
-    return 1
-
-
 def _get_fraction_weights(summary: MorphodynamicsSummary, branch_id: str, fraction_count: int) -> tuple[float, ...]:
     for bid, weights in summary.branch_composition:
         if bid == branch_id:
@@ -339,93 +333,181 @@ def format_morphodynamics_conversion_details(
     summary: MorphodynamicsSummary,
     input_dir: Path | None = None,
     output_dir: Path | None = None,
+    *,
+    activation_requested: bool = True,
+    morphology_written: bool = True,
 ) -> str:
     fractions = summary.sediment_fractions_d50_m or (summary.representative_d50_m or 0.001,)
+    if morphology_written:
+        morphology_status = "written to the FM MDU and dflowfm/mor.mor, sed.sed, and mini.ini"
+    elif not activation_requested:
+        morphology_status = "not written because activate_morphodynamics=False"
+    elif not summary.has_morphology_switch:
+        morphology_status = "not written because no DEFSUB SBST md=1 switch was found"
+    else:
+        morphology_status = "not written"
+    source_lines = _grainp_parameter_lines(input_dir / "GRAINP.TXT") if input_dir else {}
+    sed_entries = (
+        _output_key_entries(output_dir / "sed.sed", ("RhoSol", "CDryB", "SedDia", "TraFrm", "ACal"))
+        if output_dir
+        else {}
+    )
+    mor_entries = (
+        _output_key_entries(output_dir / "mor.mor", ("IUnderLyr", "TTLForm", "MxNULyr", "ThUnLyr", "ThTrLyr"))
+        if output_dir
+        else {}
+    )
     lines = [
         "Morphodynamics interpretation and FM conversion",
         "-----------------------------------------------",
         f"- SRE morphology switch: {'active' if summary.has_morphology_switch else 'inactive'}; "
         f"{summary.branch_count_with_grainsize} branch(es) have grain-size initialization.",
+        f"- FM morphology output: {morphology_status}.",
         f"- Grain-size samples: {summary.grain_size_sample_count}; representative D50={summary.representative_d50_m:g} m "
         if summary.representative_d50_m is not None
         else f"- Grain-size samples: {summary.grain_size_sample_count}; representative D50=not available.",
         f"- Sediment fractions: {', '.join(f'{value:g} m' for value in fractions)} "
         "-> one FM [Sediment] block per fraction in dflowfm/sed.sed (SedDia).",
-        f"- Underlayers: NUNLAY={summary.underlayer_count or 1}, "
-        f"DZUNLA={summary.underlayer_thickness_m or 0.5:g} m "
-        "-> [Underlayer] in dflowfm/mor.mor and layer composition files.",
-        _active_layer_thickness_detail(summary),
-        "- Sediment densities: SRE RELDEN/PACFAC -> FM RhoSol and CDryB in dflowfm/sed.sed.",
-        "- SRE $TRFORM MPMEXP is an obsolete MPM hiding/exposure option; the SRE parser maps it to experimental Egiazaroff with Dref, alpha, and gamma parameters.",
-        "- SRE $GSOPT HEIOPT=GILL selects the Gill dune-height calculation; it is not the hiding/exposure option and has no direct FM keyword in this conversion.",
-        "- SRE DEFTRN calibration factors (MU) -> spatial ACal files acal_*.xyz referenced by sed.sed."
-        if summary.transport_parameters
-        else "- No SRE DEFTRN calibration factors were found; FM ACal uses the default value.",
+        f"- Underlayers: SRE NUNLAY={summary.underlayer_count or 1} -> "
+        f"{_fm_location('mor.mor', 'MxNULyr', mor_entries)}; "
+        f"{_fm_location('mor.mor', 'IUnderLyr', mor_entries)}. "
+        "FM MxNULyr excludes the final well-mixed layer.",
+        f"- Underlayer thickness: SRE DZUNLA={summary.underlayer_thickness_m or 0.5:g} m -> "
+        f"{_fm_location('mor.mor', 'ThUnLyr', mor_entries)}.",
+        _active_layer_thickness_detail(summary, mor_entries),
+        "- Sediment densities: SRE RELDEN/PACFAC are converted to FM RhoSol and CDryB in dflowfm/sed.sed.",
+        "- SRE dune-height option; GILL selects the Gill dune-height calculation, not hiding/exposure; no direct FM output.",
+        "- SRE $GSOPT LATHIC is not mapped to TTLForm; $GSINIT/LAYNUM composition is written to mini.ini when morphology output is enabled.",
+        "- SRE DEFTRN MU is used for spatial ACal only when acal_*.xyz files are generated; "
+        "DEFTRN ty and $TRFORM settings are audited separately below.",
         "- FM coupling: dflowfm/<model>.mdu references mor.mor and sed.sed with Sedimentmodelnr=4.",
     ]
-    source_lines = _grainp_parameter_lines(input_dir / "GRAINP.TXT") if input_dir else {}
-    sed_lines = _output_key_lines(output_dir / "sed.sed", ("RhoSol", "CDryB", "SedDia")) if output_dir else {}
-    mor_lines = _output_key_lines(output_dir / "mor.mor", ("MxNULyr", "ThUnLyr", "ThTrLyr")) if output_dir else {}
+    for source_file, line_number, md_value in _morphology_switch_sources(input_dir):
+        if morphology_written:
+            destination = "enables the MDU [sediment] block and geometry BedlevType=1"
+        elif not activation_requested:
+            destination = "not emitted because activate_morphodynamics=False"
+        else:
+            destination = "not emitted"
+        lines.append(
+            f"- DEFSUB {source_file} line {line_number} SBST md={md_value} -> {destination}."
+        )
+
     lines.extend([
         "",
         "SRE parameter conversion audit",
         "------------------------------",
-        "Each entry gives the SRE meaning, source location, and the FM output key or limitation.",
+        "Each entry names the SRE field, its source location and value, and the FM output key or limitation.",
     ])
-    entries = (
-        ("$SEDPAR ALLUVIAL", "SRE alluvial-bed parameter; no direct FM equivalent identified"),
-        ("$SEDPAR KINVIS", "SRE kinematic viscosity used by graded-sediment dune/transport calculations; no direct FM output"),
-        ("$SEDPAR PACFAC", f"SRE bed porosity; {_fm_location('sed.sed', 'CDryB', sed_lines)}"),
-        ("$SEDPAR RELDEN", f"SRE relative sediment density; {_fm_location('sed.sed', 'RhoSol', sed_lines)}"),
-        ("$MORPAR ALPHADG", "SRE linear interpolation factor between Lax-Wendroff and upwind sediment continuity; no direct FM output"),
-        ("$MORPAR ALPHAEG", "SRE upwind-scheme stability parameter; no direct FM output"),
-        ("$MORPAR ITERMAX", "SRE maximum iteration steps for estuary morphology; no direct FM output"),
-        ("$MORPAR METHOD", "SRE sediment-width distribution method (EQUAL or PROPORTIONAL); no direct FM output"),
-        ("$MORPAR REDUC", "SRE reduction factor for actual sediment transport width; no direct FM output"),
-        ("$MORPAR STABGI", "SRE sediment-integral stability parameter; no direct FM output"),
-        ("$MORPAR STABGT", "SRE minimum-time-step stability parameter; no direct FM output"),
-        ("$GSOPT HEIOPT", "SRE dune-height option; GILL selects the Gill dune-height calculation, not hiding/exposure; no direct FM output"),
-        ("$GSOPT LATHIC", "SRE layer-thickness/composition initialization option; INITIAL is represented indirectly by mini.ini; no direct FM switch"),
-        ("$FRACT", f"SRE sediment-class bounds; {_fm_location('sed.sed', 'SedDia', sed_lines)}"),
-        ("$GSOPT NUNLAY", f"SRE number of underlayers; {_fm_location('mor.mor', 'MxNULyr', mor_lines)}"),
-        ("$GSPAR DZUNLA", f"SRE underlayer thickness; {_fm_location('mor.mor', 'ThUnLyr', mor_lines)}"),
-        ("$GSDEFF", f"SRE active transport-layer thickness; {_fm_location('mor.mor', 'ThTrLyr', mor_lines)}"),
-        ("DEFTRN MU", "SRE branch calibration factor; used in acal_*.xyz, referenced by sed.sed ACal"),
-    )
-    for parameter, destination in entries:
-        source = (
-            _transport_source_location(input_dir)
-            if parameter == "DEFTRN MU" and input_dir
-            else _source_location(parameter, source_lines, input_dir)
+    parameter_destinations = {
+        "$SEDPAR ALLUVIAL": "SRE alluvial-bed parameter; no direct FM output.",
+        "$SEDPAR KINVIS": "used by SRE graded-sediment calculations; no direct FM output.",
+        "$SEDPAR PACFAC": (
+            "SRE bed porosity; "
+            f"{_fm_location('sed.sed', 'CDryB', sed_entries)}; "
+            "CDryB is calculated as RhoSol * (1 - PACFAC)."
+        ),
+        "$SEDPAR RELDEN": (
+            "SRE relative sediment density; "
+            f"{_fm_location('sed.sed', 'RhoSol', sed_entries)}; "
+            "RhoSol is calculated as (1 + RELDEN) * 1000 kg/m3."
+        ),
+        "$GSOPT HEIOPT": "selects the SRE dune-height option; no direct FM output.",
+        "$GSOPT LATHIC": "no direct FM flag; GSINIT/LAYNUM composition is represented by mini.ini.",
+        "$GSOPT NUNLAY": (
+            f"number of SRE layers; {_fm_location('mor.mor', 'MxNULyr', mor_entries)}; "
+            f"{_fm_location('mor.mor', 'IUnderLyr', mor_entries)}"
+        ),
+        "$GSPAR DZUNLA": f"SRE underlayer thickness; {_fm_location('mor.mor', 'ThUnLyr', mor_entries)}",
+    }
+    for section, parameters in (
+        ("$SEDPAR", summary.sediment_parameters),
+        ("$MORPAR", summary.morphology_parameters),
+        ("$GSOPT", summary.graded_sediment_options),
+        ("$GSPAR", summary.graded_sediment_parameters),
+    ):
+        for key, value in parameters:
+            parameter = f"{section} {key}"
+            destination = parameter_destinations.get(parameter, "no direct FM output in this converter.")
+            lines.append(
+                f"- {parameter}: read at {_source_location(parameter, source_lines, input_dir)}; "
+                f"value={value}; {destination}"
+            )
+    for flag in summary.graded_sediment_flags:
+        parameter = f"$GSOPT {flag}"
+        lines.append(
+            f"- {parameter} flag: read at {_source_location(parameter, source_lines, input_dir)}; "
+            "no direct FM output in this converter."
         )
-        lines.append(f"- {parameter}: read at {source}; {destination}.")
-    lines.extend(_transport_formula_audit(summary))
+
+    lines.append(
+        f"- $FRACT: read at {_source_location('$FRACT', source_lines, input_dir)}; "
+        f"bounds become geometric-mean class diameters {', '.join(f'{value:g}' for value in fractions)} m -> "
+        f"{_fm_location('sed.sed', 'SedDia', sed_entries)}."
+    )
+    lines.append(
+        f"- $GSINIT/LAYNUM: read at {_source_location('$GSINIT', source_lines, input_dir)}; "
+        f"{len(summary.layer_composition)} branch/chainage layer-composition sample(s) -> "
+        f"{'dflowfm/mini.ini and gsd_ini_str/' if morphology_written else 'not emitted because morphology output is disabled'}; "
+        "fractions below 1e-6 are floored and the weights are normalized before writing."
+    )
+    for index, definition in enumerate(summary.active_layer_thicknesses):
+        source = _grainp_directive_location(input_dir, "$GSDEFF", index)
+        lines.append(
+            f"- $GSDEFF: read at {source}; branch {definition.branch_id}, "
+            f"{definition.start_chainage:g}-{definition.end_chainage:g} m, "
+            f"thickness={definition.thickness_m:g} m."
+        )
+    lines.extend(_transport_formula_audit(summary, input_dir, output_dir, sed_entries))
     return "\n".join(lines)
 
 
-def _active_layer_thickness_detail(summary: MorphodynamicsSummary) -> str:
+def _active_layer_thickness_detail(
+    summary: MorphodynamicsSummary,
+    mor_entries: dict[str, tuple[tuple[str, int], ...]],
+) -> str:
     definitions = summary.active_layer_thicknesses
     if not definitions:
-        return "- Active transport-layer thickness: no GSDEFF records found; FM ThTrLyr uses the default 1 m."
+        return (
+            "- Active transport-layer thickness: no GSDEFF records found; "
+            f"FM ThTrLyr uses its default; {_fm_location('mor.mor', 'ThTrLyr', mor_entries)}."
+        )
     values = sorted({item.thickness_m for item in definitions})
     if summary.active_layer_thickness_m is not None:
         return (
             f"- Active transport-layer thickness: {len(definitions)} GSDEFF range(s) all use "
-            f"{summary.active_layer_thickness_m:g} m -> one FM ThTrLyr value is used."
+            f"{summary.active_layer_thickness_m:g} m -> one FM ThTrLyr value is used; "
+            f"{_fm_location('mor.mor', 'ThTrLyr', mor_entries)}."
         )
-    return f"- Active transport-layer thickness: GSDEFF has non-uniform values ({', '.join(f'{value:g}' for value in values)} m); FM ThTrLyr uses the default 1 m."
+    return (
+        f"- Active transport-layer thickness: GSDEFF has non-uniform values "
+        f"({', '.join(f'{value:g}' for value in values)} m); FM ThTrLyr uses its default; "
+        f"{_fm_location('mor.mor', 'ThTrLyr', mor_entries)}."
+    )
 
 
-def _transport_formula_audit(summary: MorphodynamicsSummary) -> list[str]:
+def _transport_formula_audit(
+    summary: MorphodynamicsSummary,
+    input_dir: Path | None,
+    output_dir: Path | None,
+    sed_entries: dict[str, tuple[tuple[str, int], ...]],
+) -> list[str]:
     lines = [
         "",
         "Branch-specific sediment transport audit",
         "-----------------------------------------",
         "SRE DEFTRN ty codes: 0=Engelund-Hansen, 1=Meyer-Peter & Muller, 2=Ackers-White, 3=van Rijn, 4=Parker-Klingeman, 5=user-defined.",
-        "SRE $TRFORM MEY1 selects the special Meyer-Peter-Muller relation; MPMEXP is parsed by SRE as experimental Egiazaroff hiding/exposure with Dref selector, alpha, and gamma.",
+        f"- FM TraFrm output: {_fm_location('sed.sed', 'TraFrm', sed_entries)}; "
+        "the writer currently fixes TraFrm=1 instead of selecting it from SRE DEFTRN ty.",
+        "SRE $TRFORM MEY1 selects the special Meyer-Peter-Muller relation; MPMEXP configures SRE hiding/exposure "
+        "but is not transferred to FM.",
+        "SRE $TRFORM values are read for this audit but are not emitted as FM formula parameters.",
     ]
     def_trn = {item.branch_id: item for item in summary.transport_parameters}
     text_trform = {item.branch_id: item for item in summary.transport_formulas}
+    def_sources = _transport_source_locations(input_dir)
+    trform_sources = _grainp_directive_lines(input_dir, "$TRFORM")
+    trform_indexes = {item.branch_id: index for index, item in enumerate(summary.transport_formulas)}
     all_branch_ids = sorted(set(def_trn) | set(text_trform))
     if set(def_trn) == set(text_trform):
         lines.append(f"- Branch coverage: {len(all_branch_ids)} $TRFORM definitions match {len(def_trn)} DEFTRN records.")
@@ -440,25 +522,55 @@ def _transport_formula_audit(summary: MorphodynamicsSummary) -> list[str]:
     for branch_id in all_branch_ids:
         def_item = def_trn.get(branch_id)
         trform_item = text_trform.get(branch_id)
-        def_formula = _transport_formula_name(def_item.formula_type) if def_item else "not found"
-        fm_formula = f"TraFrm={def_item.formula_type}" if def_item and def_item.formula_type is not None else "TraFrm=not available"
-        detail = f"branch {branch_id}: DEFTRN {def_formula}, {fm_formula}"
+        detail = f"branch {branch_id}:"
+        if def_item:
+            detail += (
+                f" DEFTRN ty={def_item.formula_type} "
+                f"({_transport_formula_name(def_item.formula_type)}), "
+                f"read at {def_sources.get(branch_id, 'DEFTRN.* source line unavailable')}"
+            )
+        else:
+            detail += " DEFTRN record not found"
         if def_item and def_item.calibration_factor is not None:
-            detail += f", MU={def_item.calibration_factor:g}"
+            if output_dir and list(output_dir.glob("acal_*.xyz")):
+                detail += f"; MU={def_item.calibration_factor:g} -> spatial FM ACal"
+            else:
+                detail += f"; MU={def_item.calibration_factor:g} -> not written to FM ACal"
+        if def_item and def_item.coefficients:
+            coefficients = ", ".join(f"{key}={value:g}" for key, value in def_item.coefficients)
+            detail += f"; DEFTRN coefficients [{coefficients}] are not emitted"
         if trform_item:
-            detail += f"; $TRFORM {trform_item.formula_name}"
+            formula_index = trform_indexes[branch_id]
+            source = (
+                f"GRAINP.TXT line {trform_sources[formula_index][0]}"
+                if formula_index < len(trform_sources)
+                else "GRAINP.TXT source line unavailable"
+            )
+            detail += f"; $TRFORM {trform_item.formula_name} read at {source}"
             if trform_item.calibration_factor is not None:
                 detail += f" calibration={trform_item.calibration_factor:g}"
             if "MPMEXP" in trform_item.options:
                 option_index = trform_item.options.index("MPMEXP")
                 detail += f" MPMEXP parameters={' '.join(trform_item.options[option_index + 1:])}"
+            detail += "; formula calibration/options are not emitted"
         lines.append(f"- {detail}.")
 
     formula_types = {item.formula_type for item in summary.transport_parameters if item.formula_type is not None}
-    if len(formula_types) <= 1:
-        lines.append("- FM limitation: TraFrm is configured per [Sediment] block rather than per branch; the current case is consistent because all DEFTRN branches use the same formula code.")
+    if len(formula_types) <= 1 and formula_types == {1}:
+        lines.append(
+            "- FM limitation: the current SRE DEFTRN ty=1 agrees with the writer's fixed TraFrm=1, "
+            "but $TRFORM formula variants, calibration values, hiding/exposure options, and DEFTRN coefficients are not preserved."
+        )
+    elif len(formula_types) <= 1:
+        lines.append(
+            "- FM limitation: TraFrm is configured per [Sediment] block rather than per branch; "
+            "the writer still emits TraFrm=1, so the SRE formula code is not preserved."
+        )
     else:
-        lines.append("- FM limitation: TraFrm is configured per [Sediment] block rather than per branch; branch-specific SRE formula codes cannot currently be preserved exactly.")
+        lines.append(
+            "- FM limitation: TraFrm is configured per [Sediment] block rather than per branch; "
+            "branch-specific SRE formula codes cannot currently be preserved, and the writer emits TraFrm=1."
+        )
     return lines
 
 
@@ -473,59 +585,110 @@ def _transport_formula_name(formula_type: int | None) -> str:
     }.get(formula_type, f"unknown(code={formula_type})")
 
 
-def _grainp_parameter_lines(path: Path) -> dict[str, int]:
+def _grainp_parameter_lines(path: Path | None) -> dict[str, int]:
+    if path is None:
+        return {}
     if not path.exists():
         return {}
     result: dict[str, int] = {}
     section = ""
     for line_number, raw_line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1):
         line = raw_line.split("!", 1)[0].strip()
+        if not line:
+            continue
         tokens = line.split()
-        if tokens and tokens[0].upper().startswith("$"):
-            section = tokens[0].upper()
+        directive = tokens[0].upper()
+        if directive.startswith("$"):
+            if directive in {"$SEDPAR", "$MORPAR", "$GSOPT", "$GSPAR"}:
+                section = directive
+            else:
+                section = ""
+                if directive in {"$FRACT", "$GSDEFF", "$GSINIT", "$TRFORM"}:
+                    result.setdefault(directive, line_number)
         if section in {"$SEDPAR", "$MORPAR", "$GSOPT", "$GSPAR"}:
-            for key in ("ALLUVIAL", "KINVIS", "PACFAC", "RELDEN", "ALPHADG", "ALPHAEG", "ITERMAX", "METHOD", "REDUC", "STABGI", "STABGT", "HEIOPT", "LATHIC", "NUNLAY", "DZUNLA"):
-                if key in result:
-                    continue
-                if re.search(rf"\b{key}\b", line, flags=re.IGNORECASE):
-                    result[f"{section} {key}"] = line_number
-        if tokens and tokens[0].upper() == "$FRACT":
-            result["$FRACT"] = line_number
-        if tokens and tokens[0].upper() == "$GSDEFF":
-            result["$GSDEFF"] = line_number
+            for key in re.findall(r"\b([A-Z][A-Z0-9_]*)\s*=", line, flags=re.IGNORECASE):
+                result.setdefault(f"{section} {key.upper()}", line_number)
+            if section == "$GSOPT" and "=" not in line:
+                for flag in tokens:
+                    if re.fullmatch(r"[A-Z][A-Z0-9_]*", flag, flags=re.IGNORECASE):
+                        result.setdefault(f"$GSOPT {flag.upper()}", line_number)
     return result
 
 
-def _output_key_lines(path: Path, keys: tuple[str, ...]) -> dict[str, int]:
+def _output_key_entries(
+    path: Path,
+    keys: tuple[str, ...],
+) -> dict[str, tuple[tuple[str, int], ...]]:
     if not path.exists():
         return {}
-    result: dict[str, int] = {}
+    result: dict[str, list[tuple[str, int]]] = {key: [] for key in keys}
     for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        for key in keys:
-            if key not in result and raw_line.strip().startswith(key):
-                result[key] = line_number
-    return result
+        parts = raw_line.strip().split("=", maxsplit=1)
+        if len(parts) != 2:
+            continue
+        key = parts[0].strip()
+        if key in result:
+            result[key].append((parts[1].strip(), line_number))
+    return {key: tuple(entries) for key, entries in result.items()}
 
 
-def _fm_location(filename: str, key: str, output_lines: dict[str, int]) -> str:
-    line = output_lines.get(key)
-    return f"used in dflowfm/{filename} {key}" + (f" (line {line})" if line else "")
+def _fm_location(
+    filename: str,
+    key: str,
+    output_entries: dict[str, tuple[tuple[str, int], ...]],
+) -> str:
+    entries = output_entries.get(key, ())
+    if not entries:
+        return f"not written to dflowfm/{filename} ({key} absent)"
+    value, line = entries[0]
+    detail = f"used in dflowfm/{filename} {key} (line {line}, value={value}"
+    if len(entries) > 1:
+        detail += f"; {len(entries)} entries"
+    return detail + ")"
 
 
 def _source_location(parameter: str, source_lines: dict[str, int], input_dir: Path | None) -> str:
     line = source_lines.get(parameter)
-    filename = "GRAINP.TXT" if input_dir else "GRAINP.TXT"
-    return f"{filename} line {line}" if line else f"{filename} line not found"
+    return f"GRAINP.TXT line {line}" if line and input_dir else "GRAINP.TXT line not found"
 
 
-def _transport_source_location(input_dir: Path) -> str:
-    locations: list[str] = []
-    for path in sorted(input_dir.glob("DEFTRN.*")):
-        line_numbers = [
-            str(line_number)
-            for line_number, raw_line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1)
-            if raw_line.strip().upper().startswith("TRNS ") and re.search(r"\bmu\b", raw_line, flags=re.IGNORECASE)
-        ]
-        if line_numbers:
-            locations.append(f"{path.name} lines {','.join(line_numbers)}")
-    return "; ".join(locations) if locations else "DEFTRN.* TRNS records"
+def _morphology_switch_sources(input_dir: Path | None) -> list[tuple[str, int, str]]:
+    if input_dir is None:
+        return []
+    records = load_records(input_dir, "DEFSUB", {"SBST"})
+    return [
+        (record.source_file.name, record.source_line_start, record.attrs.get("md", "not present"))
+        for record in records
+    ]
+
+
+def _transport_source_locations(input_dir: Path | None) -> dict[str, str]:
+    if input_dir is None:
+        return {}
+    records = load_records(input_dir, "DEFTRN", {"TRNS"})
+    return {
+        branch_id: f"{record.source_file.name} line {record.source_line_start}"
+        for record in records
+        if (branch_id := record.attrs.get("ci")) and branch_id != "-1"
+    }
+
+
+def _grainp_directive_lines(input_dir: Path | None, directive: str) -> tuple[tuple[int, str], ...]:
+    if input_dir is None:
+        return ()
+    path = input_dir / "GRAINP.TXT"
+    if not path.exists():
+        return ()
+    lines: list[tuple[int, str]] = []
+    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1):
+        line = raw_line.split("!", 1)[0].strip()
+        if re.match(rf"^{re.escape(directive)}(?:\s|$)", line, flags=re.IGNORECASE):
+            lines.append((line_number, line))
+    return tuple(lines)
+
+
+def _grainp_directive_location(input_dir: Path | None, directive: str, index: int) -> str:
+    lines = _grainp_directive_lines(input_dir, directive)
+    if index < len(lines):
+        return f"GRAINP.TXT line {lines[index][0]}"
+    return f"GRAINP.TXT {directive} source line unavailable"

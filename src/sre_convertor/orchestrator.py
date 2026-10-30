@@ -208,6 +208,13 @@ def convert_network_case(
             )
             created_files.extend([mor_file, sed_file, composition_file, bed_comp_file])
             include_morphology = True
+            if case_model.morphodynamics.transport_parameters or case_model.morphodynamics.transport_formulas:
+                warnings.append(
+                    "SRE sediment transport formulas are not fully represented in FM: sed.sed TraFrm is fixed "
+                    "to 1, while DEFTRN ty, coefficients, and $TRFORM calibration/options are not transferred "
+                    "(DEFTRN MU is mapped to ACal only when spatial files are generated). "
+                    "See conversion.log for the branch audit."
+                )
         else:
             warnings.append(
                 "activate_morphodynamics=True requested, but no active morphology switch was found in DEFSUB.*."
@@ -300,14 +307,12 @@ def convert_network_case(
         options,
         report,
         network_only=False,
-        morphodynamics_conversion_details=(
-            format_morphodynamics_conversion_details(
-                case_model.morphodynamics,
-                input_dir=input_dir,
-                output_dir=dflowfm_dir,
-            )
-            if include_morphology
-            else ""
+        morphodynamics_conversion_details=format_morphodynamics_conversion_details(
+            case_model.morphodynamics,
+            input_dir=input_dir,
+            output_dir=dflowfm_dir if include_morphology else None,
+            activation_requested=options.activate_morphodynamics,
+            morphology_written=include_morphology,
         ),
     )
     report.files_created.append(log_path)

@@ -54,7 +54,7 @@ def test_write_morphodynamics_files_writes_mor_and_sed(tmp_path: Path) -> None:
     assert "Type = volume fraction" in bed_comp_text
 
 
-def test_write_morphodynamics_files_maps_initial_lathic_to_ttlform(tmp_path: Path) -> None:
+def test_write_morphodynamics_files_uses_constant_ttlform_for_initial_layers(tmp_path: Path) -> None:
     summary = MorphodynamicsSummary(
         branch_count_with_grainsize=1,
         has_morphology_switch=True,

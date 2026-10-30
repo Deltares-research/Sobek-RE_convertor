@@ -46,13 +46,12 @@ In progress:
 	- Source readiness detection is implemented (`DEFICN.*` MPIN + `DEFSUB.*` morphology switch).
 	- `activate_morphodynamics=True` generates morphodynamics artifacts for inspection.
 	- Base `mor.mor` and `sed.sed` are generated from converted source summary values.
-	- `sed.sed` now contains multiple derived sediment fractions (D50 classes) from MPIN grain-size samples.
-	- Spatial bed composition export is generated in `mor_composition.ini` with `gsd_ini_str/lyr01_*.xyz` layer files.
-	- `mor.mor` references `mor_composition.ini` through `[Underlayer] IniComp`.
-	- SRE `NUNLAY`/`DZUNLA` values are transferred to `mor.mor` and matching layer xyz files.
-	- SRE `$FRACT` and `$GSINIT` values from `GRAINP.TXT` drive sediment classes and per-layer spatial composition.
-	- SRE `$SEDPAR`/`$MORPAR`/`$GSOPT`/`$GSPAR` blocks are parsed for traceability; `RELDEN`/`PACFAC` drive sediment densities.
-	- SRE `DEFTRN.*` branch `mu` calibration values are exported as spatial `acal_*.xyz` files and referenced from `sed.sed`.
+	- `sed.sed` uses geometric-mean class diameters from `GRAINP.TXT` `$FRACT`; MPIN grain-size values are only a fallback when `$FRACT` is absent.
+	- Spatial bed composition from `$GSINIT`/`LAYNUM` is written to `mini.ini` with `gsd_ini_str/lyr*_*.xyz` files, referenced by `mor.mor`; fractions below `1e-6` are floored and normalized before writing.
+	- SRE `NUNLAY` is converted to FM `MxNULyr` (excluding the final well-mixed layer); `DZUNLA` and uniform `GSDEFF` thicknesses map to `ThUnLyr` and `ThTrLyr`.
+	- SRE `$SEDPAR RELDEN`/`PACFAC` determine FM `RhoSol`/`CDryB`. Other sediment, morphology, and graded-sediment options are reported as not directly mapped when no FM equivalent is generated.
+	- The `conversion.log` records source flags, values, input locations, generated FM keywords, and unsupported mappings, including when morphodynamics output is disabled.
+	- Current transport limitation: FM `TraFrm` is fixed at `1`; SRE `DEFTRN ty` and coefficients plus `$TRFORM` formula calibration/options are not transferred. `DEFTRN MU` is written to spatial `acal_*.xyz` files when available, and a conversion warning is emitted.
 	- MDU sediment coupling is enabled with `Sedimentmodelnr = 4`, `BedlevType = 1`, and `Conveyance2D = -1`.
 	- Still simplified: advanced transport options are pending.
 

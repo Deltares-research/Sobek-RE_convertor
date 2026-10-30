@@ -2,7 +2,7 @@ from pathlib import Path
 
 from sre_convertor.io.sre.friction_reader import read_friction
 from sre_convertor.io.sre.initial_conditions_reader import read_initial_conditions
-from sre_convertor.io.sre.morphodynamics_reader import read_morphodynamics_summary
+from sre_convertor.io.sre.morphodynamics_reader import _sample_from_row, read_morphodynamics_summary
 from sre_convertor.io.sre.condition_reader import read_conditions
 from sre_convertor.io.sre.network_reader import read_sre_network
 from sre_convertor.io.sre.runtime_reader import read_runtime_settings
@@ -122,3 +122,9 @@ def test_read_morphodynamics_summary_detects_source_signals() -> None:
     assert first_branch
     assert len(first_weights) == len(summary.sediment_fractions_d50_m)
     assert abs(sum(first_weights) - 1.0) < 1e-6
+
+
+def test_mpin_grain_size_samples_use_the_d50_column() -> None:
+    row = ("0", "0.002", "0.003", "0.020", "0.021", "0.010", "0.012", "0.060", "0.065", "<")
+
+    assert _sample_from_row(row) == 0.01

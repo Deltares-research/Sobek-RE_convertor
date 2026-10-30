@@ -178,6 +178,9 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "activate_rtc = False" in log_text
     assert "include_input_files = False" in log_text
     assert "include_input_read_details = False" in log_text
+    assert "Morphodynamics interpretation and FM conversion" in log_text
+    assert "FM morphology output: not written because activate_morphodynamics=False." in log_text
+    assert "DEFSUB DEFSUB.1 line 1 SBST md=1 -> not emitted because activate_morphodynamics=False." in log_text
     assert "SRE structure and RTC code interpretation" in log_text
     assert "SRE STDS ty=2 identifies a General Structure and is converted to D-Flow FM generalstructure." in log_text
     assert "SRE CNTL ca=0 controls crest level; ca=1 controls crest width; ca=2 controls gate height." in log_text
@@ -187,10 +190,10 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "read_cross_sections" in log_text
     assert "Network input read details" in log_text
     assert "All input file read details" not in log_text
-    assert "DEFCND.1: read " in log_text
-    assert "DEFCRS.1 lines " in log_text
-    assert "DEFICN.1: read " in log_text
-    assert "GRAINP.TXT: read " in log_text
+    assert "source=DEFCND.2 lines=" in log_text
+    assert "source=DEFCRS.2 lines=" in log_text
+    assert "source=DEFICN.2 lines=" in log_text
+    assert "$FRACT: read at GRAINP.TXT line 19" in log_text
     assert "Parsed values read" in log_text
     assert "contains duplicate timestamps" in log_text
     assert "added a start point using the first value" in log_text
@@ -204,7 +207,7 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "minimum=" in log_text
     assert "maximum=" in log_text
     assert "time_series=[" not in log_text
-    assert "cross-section definition id=" in log_text
+    assert "- Cross-section definition\n  id=" in log_text
     assert "levels_count=" in log_text
     assert "levels_min=" in log_text
     assert "levels_max=" in log_text
@@ -212,13 +215,13 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "main_channel_width=" in log_text
     assert "floodplain_1_width=" in log_text
     assert "floodplain_2_width=" in log_text
-    assert "roughness branch=" in log_text
+    assert "- Roughness\n  branch=" in log_text
     assert "section='Main channel'" in log_text
-    assert "chainage=0 value=" in log_text
+    assert "chainage=0\n  value=" in log_text
     assert "section='Floodplain 1'" in log_text
     assert "section='Floodplain 2'" in log_text
-    assert "initial condition branch=" in log_text
-    assert "structure id=" in log_text
+    assert "- Initial condition\n  branch=" in log_text
+    assert "- Structure\n  id=" in log_text
     assert "sre_ty='2'" in log_text
     assert "converted_type='generalstructure'" in log_text
     assert "DEFTOP source records:" in log_text
@@ -231,7 +234,7 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "minimum_step=" in log_text
     assert "maximum_step=" in log_text
     assert "chainages=" not in log_text
-    assert "dflowfm/demo_case_log_net.nc" in log_text
+    assert "dflowfm/grd_net.nc" in log_text
     assert "dflowfm/demo_case_log.mdu" in log_text
     assert "conversion.log" not in log_text
     assert f"Network nodes: {report.nodes_count}" in log_text
@@ -271,7 +274,7 @@ def test_convert_case_can_disable_cross_sections(tmp_path: Path) -> None:
     input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
     output_dir = tmp_path / "fm_case_cross"
 
-    convert_case(
+    report = convert_case(
         input_dir,
         output_dir,
         model_name="demo_case_cross",
@@ -288,7 +291,7 @@ def test_convert_case_can_reduce_runtime_for_testing(tmp_path: Path) -> None:
     input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
     output_dir = tmp_path / "fm_case_short"
 
-    convert_case(
+    report = convert_case(
         input_dir,
         output_dir,
         model_name="demo_case_short",
@@ -304,7 +307,7 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     input_dir = Path(__file__).resolve().parents[1] / "data" / "sre_simulation"
     output_dir = tmp_path / "fm_case_mor"
 
-    convert_case(
+    report = convert_case(
         input_dir,
         output_dir,
         model_name="demo_case_mor",
@@ -328,13 +331,23 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     assert "PACFAC: read at GRAINP.TXT line" in log_text
     assert "used in dflowfm/sed.sed CDryB (line" in log_text
     assert "ALLUVIAL: read at GRAINP.TXT line" in log_text
+    assert "DEFSUB DEFSUB.1 line 1 SBST md=1 -> enables the MDU [sediment] block and geometry BedlevType=1." in log_text
+    assert "$GSOPT NONNGP flag: read at GRAINP.TXT line 15; no direct FM output" in log_text
+    assert "$GSOPT NUNLAY: read at GRAINP.TXT line 13; value=20; number of SRE layers;" in log_text
+    assert "dflowfm/mor.mor MxNULyr (line 26, value=19)" in log_text
+    assert "dflowfm/mor.mor IUnderLyr (line 21, value=2)" in log_text
+    assert "$SEDPAR PACFAC: read at GRAINP.TXT line 25030; value=0.30; SRE bed porosity" in log_text
+    assert "RhoSol (line 12, value=2.6500000e+03" in log_text
+    assert "CDryB (line 14, value=1.8550000e+03" in log_text
     assert "SRE dune-height option; GILL selects the Gill dune-height calculation" in log_text
     assert "SRE $TRFORM MEY1 selects the special Meyer-Peter-Muller relation" in log_text
     assert "MPMEXP parameters=1 0.4 2" in log_text
     assert "Branch coverage: 7 $TRFORM definitions match 7 DEFTRN records" in log_text
-    assert "all DEFTRN branches use the same formula code" in log_text
+    assert "the writer currently fixes TraFrm=1 instead of selecting it from SRE DEFTRN ty" in log_text
+    assert "$TRFORM formula variants, calibration values, hiding/exposure options, and DEFTRN coefficients are not preserved" in log_text
+    assert any("SRE sediment transport formulas are not fully represented in FM" in warning for warning in report.warnings)
     assert "-> one FM [Sediment] block per fraction" in log_text
-    assert "-> [Underlayer] in dflowfm/mor.mor" in log_text
+    assert "FM MxNULyr excludes the final well-mixed layer" in log_text
     assert "all use 0.8 m -> one FM ThTrLyr value is used" in log_text
     assert "$GSDEFF: read at GRAINP.TXT line" in log_text
     assert log_text.index("write_cross_section_") < log_text.index("Morphodynamics interpretation")
