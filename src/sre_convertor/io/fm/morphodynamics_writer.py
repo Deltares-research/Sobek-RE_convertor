@@ -39,6 +39,11 @@ def write_morphodynamics_files(
     layer_count = summary.underlayer_count or 1
     layer_thickness_m = summary.underlayer_thickness_m or 0.5
     transport_layer_thickness_m = summary.active_layer_thickness_m or 1.0
+    hiding_exposure_enabled = any(
+        option in {"HIDEXP", "MPMEXP"}
+        for formula in summary.transport_formulas
+        for option in formula.options
+    )
     max_underlayers = max(layer_count - 1, 1)
     underlayer_type = 2 if layer_count > 1 else 1
     ttl_form = 1
@@ -56,11 +61,13 @@ def write_morphodynamics_files(
 [Morphology]
    MorFac           = 1.0
    MorStt           = 0.0
-   Thresh           = 1.0
+   Thresh           = {transport_layer_thickness_m:.7e}
+   SedThr           = 1.0000000e-01
    BedUpd           = 1
    CmpUpd           = 1
    NeuBcMud         = 0
    NeuBcSand        = 0
+   IHidExp         = {1 if hiding_exposure_enabled else 0}
 
 [Output]
    Dm               = true
@@ -347,13 +354,14 @@ def format_morphodynamics_conversion_details(
     else:
         morphology_status = "not written"
     source_lines = _grainp_parameter_lines(input_dir / "GRAINP.TXT") if input_dir else {}
+    grainp_exists = bool(input_dir and (input_dir / "GRAINP.TXT").exists())
     sed_entries = (
         _output_key_entries(output_dir / "sed.sed", ("RhoSol", "CDryB", "SedDia", "TraFrm", "ACal"))
         if output_dir
         else {}
     )
     mor_entries = (
-        _output_key_entries(output_dir / "mor.mor", ("IUnderLyr", "TTLForm", "MxNULyr", "ThUnLyr", "ThTrLyr"))
+        _output_key_entries(output_dir / "mor.mor", ("IUnderLyr", "TTLForm", "MxNULyr", "ThUnLyr", "ThTrLyr", "Thresh", "SedThr", "BedUpd"))
         if output_dir
         else {}
     )
@@ -366,6 +374,14 @@ def format_morphodynamics_conversion_details(
         f"- Grain-size samples: {summary.grain_size_sample_count}; representative D50={summary.representative_d50_m:g} m "
         if summary.representative_d50_m is not None
         else f"- Grain-size samples: {summary.grain_size_sample_count}; representative D50=not available.",
+        *(
+            [
+                "- MPIN grain-size values are reported for diagnostics only; they are not used for FM sediment "
+                "fractions or bed composition because GRAINP.TXT provides $FRACT and $GSINIT/LAYNUM."
+            ]
+            if grainp_exists
+            else []
+        ),
         f"- Sediment fractions: {', '.join(f'{value:g} m' for value in fractions)} "
         "-> one FM [Sediment] block per fraction in dflowfm/sed.sed (SedDia).",
         f"- Underlayers: SRE NUNLAY={summary.underlayer_count or 1} -> "
@@ -375,6 +391,15 @@ def format_morphodynamics_conversion_details(
         f"- Underlayer thickness: SRE DZUNLA={summary.underlayer_thickness_m or 0.5:g} m -> "
         f"{_fm_location('mor.mor', 'ThUnLyr', mor_entries)}.",
         _active_layer_thickness_detail(summary, mor_entries),
+        f"- Sediment-availability threshold: Thresh = ThTrLyr = {summary.active_layer_thickness_m or 1.0:g} m "
+        "(including the 1 m fallback when GSDEFF is absent or non-uniform). "
+        "Conversion choice: use one active-layer thickness as the sediment-cover scale for transport/erosion "
+        "reduction. This is not an exact mapping of SRE ALLUVIAL, whose threshold scales with water depth; "
+        f"{_fm_location('mor.mor', 'Thresh', mor_entries)}.",
+        "- Minimum water depth for sediment computations: SedThr = 0.1 m. "
+        "Conversion choice: exclude very shallow water from sediment computations; "
+        "no direct SRE sediment-specific depth threshold is mapped; "
+        f"{_fm_location('mor.mor', 'SedThr', mor_entries)}.",
         "- Sediment densities: SRE RELDEN/PACFAC are converted to FM RhoSol and CDryB in dflowfm/sed.sed.",
         "- SRE dune-height option; GILL selects the Gill dune-height calculation, not hiding/exposure; no direct FM output.",
         "- SRE $GSOPT LATHIC is not mapped to TTLForm; $GSINIT/LAYNUM composition is written to mini.ini when morphology output is enabled.",
@@ -397,11 +422,16 @@ def format_morphodynamics_conversion_details(
         "",
         "SRE parameter conversion audit",
         "------------------------------",
-        "Each entry names the SRE field, its source location and value, and the FM output key or limitation.",
+        "Each entry names the SRE field, its meaning, source location and value, and the FM output key or limitation.",
     ])
     parameter_destinations = {
-        "$SEDPAR ALLUVIAL": "SRE alluvial-bed parameter; no direct FM output.",
-        "$SEDPAR KINVIS": "used by SRE graded-sediment calculations; no direct FM output.",
+        "$SEDPAR ALLUVIAL": (
+            "SRE alluvial-layer factor for the depth-dependent transport-layer thickness near a fixed bed; "
+            "FM Thresh is a converter choice and is not an exact mapping."
+        ),
+        "$SEDPAR KINVIS": (
+            "SRE water kinematic viscosity used by sediment-transport calculations; no direct FM output."
+        ),
         "$SEDPAR PACFAC": (
             "SRE bed porosity; "
             f"{_fm_location('sed.sed', 'CDryB', sed_entries)}; "
@@ -412,13 +442,71 @@ def format_morphodynamics_conversion_details(
             f"{_fm_location('sed.sed', 'RhoSol', sed_entries)}; "
             "RhoSol is calculated as (1 + RELDEN) * 1000 kg/m3."
         ),
-        "$GSOPT HEIOPT": "selects the SRE dune-height option; no direct FM output.",
-        "$GSOPT LATHIC": "no direct FM flag; GSINIT/LAYNUM composition is represented by mini.ini.",
+        "$MORPAR REDUC": (
+            "legacy SRE reduction factor for actual transport width; Sobek-RE documents this as a dummy "
+            "parameter that should be 1; no direct FM output."
+        ),
+        "$MORPAR ITERMAX": (
+            "maximum number of SRE morphology time-step reductions/iterations; no direct FM output."
+        ),
+        "$MORPAR STABGI": (
+            "SRE stability parameter for sediment-integral calculations; no direct FM output."
+        ),
+        "$MORPAR STABGT": (
+            "SRE stability parameter for the minimum morphology time step; no direct FM output."
+        ),
+        "$MORPAR ALPHADG": (
+            "SRE blending parameter between Lax-Wendroff and upwind sediment-continuity schemes; "
+            "no direct FM output."
+        ),
+        "$MORPAR ALPHAEG": (
+            "SRE stability parameter for the upwind sediment-continuity scheme; no direct FM output."
+        ),
+        "$GSOPT HEIOPT": (
+            "selects the SRE dune-height predictor (for example, GILL); no direct FM output."
+        ),
+        "$GSOPT LENOPT": (
+            "selects the SRE dune-length predictor (YALIN, VRIJN, or USER); no direct FM output."
+        ),
+        "$GSOPT ROUOPT": (
+            "selects the SRE dune-roughness option (VRIJN, WHITE, or INITIAL); no direct FM output."
+        ),
+        "$GSOPT LATHIC": (
+            "selects the SRE transport-layer thickness method; no direct FM flag, while GSDEFF "
+            "thicknesses are represented by FM ThTrLyr."
+        ),
+        "$GSOPT LAYERS": (
+            "selects one or two SRE transport/exchange layers; no separate FM layer-selection flag is written."
+        ),
         "$GSOPT NUNLAY": (
-            f"number of SRE layers; {_fm_location('mor.mor', 'MxNULyr', mor_entries)}; "
+            f"number of SRE underlayers; {_fm_location('mor.mor', 'MxNULyr', mor_entries)}; "
             f"{_fm_location('mor.mor', 'IUnderLyr', mor_entries)}"
         ),
-        "$GSPAR DZUNLA": f"SRE underlayer thickness; {_fm_location('mor.mor', 'ThUnLyr', mor_entries)}",
+        "$GSPAR BETA1": (
+            "coefficient for the SRE Gill dune-height predictor; no direct FM output."
+        ),
+        "$GSPAR BETA2": (
+            "coefficient for the SRE Gill dune-height predictor; no direct FM output."
+        ),
+        "$GSPAR THEXFA": (
+            "ratio of SRE exchange-layer thickness to transport-layer thickness; no direct FM output."
+        ),
+        "$GSPAR FDI": (
+            "SRE coefficient for the transport-layer probability in exchange flux; no direct FM output."
+        ),
+        "$GSPAR DUNLEN": (
+            "user-specified SRE dune length when LENOPT=USER; no direct FM output."
+        ),
+        "$GSPAR DZUNLA": (
+            f"SRE underlayer thickness; {_fm_location('mor.mor', 'ThUnLyr', mor_entries)}."
+        ),
+        "$GSPAR REDFACMIL": (
+            "SRE minimum effective layer thickness factor (REDFACMIL * Dm) when LATHIC=RIBB; "
+            "no direct FM output."
+        ),
+        "$GSPAR ZBEPS": (
+            "SRE minimum height above a fixed/non-moving bed layer; no direct FM output."
+        ),
     }
     for section, parameters in (
         ("$SEDPAR", summary.sediment_parameters),
@@ -428,16 +516,43 @@ def format_morphodynamics_conversion_details(
     ):
         for key, value in parameters:
             parameter = f"{section} {key}"
-            destination = parameter_destinations.get(parameter, "no direct FM output in this converter.")
+            destination = parameter_destinations.get(
+                parameter,
+                "SRE option meaning is not catalogued here; no direct FM output in this converter.",
+            )
+            if parameter == "$MORPAR METHOD":
+                if value.upper() == "PROPORTIONAL":
+                    destination = (
+                        "FM uses built-in proportional updating for tabulated 1D (zwRiver) cross-sections: "
+                        "bed-level changes scale with depth below the main-channel reference level. "
+                        "No separate METHOD keyword is written; BedUpd=1 enables bed updating; "
+                        f"{_fm_location('mor.mor', 'BedUpd', mor_entries)}. "
+                        "This matches the proportional update principle, not necessarily every SRE "
+                        "reference-level or cross-section edge case."
+                    )
+                else:
+                    destination = (
+                        f"SRE cross-section update METHOD={value} is not mapped: "
+                        "FM uses built-in proportional updating for tabulated 1D (zwRiver) cross-sections. "
+                        "No method-selection keyword is written; "
+                        f"{_fm_location('mor.mor', 'BedUpd', mor_entries)}."
+                    )
             lines.append(
                 f"- {parameter}: read at {_source_location(parameter, source_lines, input_dir)}; "
                 f"value={value}; {destination}"
             )
     for flag in summary.graded_sediment_flags:
         parameter = f"$GSOPT {flag}"
+        flag_meanings = {
+            "ADNOML": "adapts non-moving-layer composition to the layer above",
+            "EXTOUT": "requests extra SRE morphology output at selected steps",
+            "NNONGP": "prevents negative fractions during SRE cross-section adaptation",
+            "SEDIM": "forces sedimentation in composition equations and excludes exchange flux",
+        }
+        meaning = flag_meanings.get(flag, "enables an SRE graded-sediment option")
         lines.append(
             f"- {parameter} flag: read at {_source_location(parameter, source_lines, input_dir)}; "
-            "no direct FM output in this converter."
+            f"{meaning}; no direct FM output in this converter."
         )
 
     lines.append(
@@ -454,9 +569,10 @@ def format_morphodynamics_conversion_details(
     for index, definition in enumerate(summary.active_layer_thicknesses):
         source = _grainp_directive_location(input_dir, "$GSDEFF", index)
         lines.append(
-            f"- $GSDEFF: read at {source}; branch {definition.branch_id}, "
+            f"- $GSDEFF: defines active transport-layer thickness; read at {source}; branch {definition.branch_id}, "
             f"{definition.start_chainage:g}-{definition.end_chainage:g} m, "
-            f"thickness={definition.thickness_m:g} m."
+            f"thickness={definition.thickness_m:g} m -> {_fm_location('mor.mor', 'ThTrLyr', mor_entries)} "
+            "when the values are uniform."
         )
     lines.extend(_transport_formula_audit(summary, input_dir, output_dir, sed_entries))
     return "\n".join(lines)
@@ -499,8 +615,8 @@ def _transport_formula_audit(
         "SRE DEFTRN ty codes: 0=Engelund-Hansen, 1=Meyer-Peter & Muller, 2=Ackers-White, 3=van Rijn, 4=Parker-Klingeman, 5=user-defined.",
         f"- FM TraFrm output: {_fm_location('sed.sed', 'TraFrm', sed_entries)}; "
         "the writer currently fixes TraFrm=1 instead of selecting it from SRE DEFTRN ty.",
-        "SRE $TRFORM MEY1 selects the special Meyer-Peter-Muller relation; MPMEXP configures SRE hiding/exposure "
-        "but is not transferred to FM.",
+        "SRE $TRFORM MEY1 selects the special Meyer-Peter-Muller relation; active HIDEXP/MPMEXP options "
+        "are represented by FM IHidExp.",
         "SRE $TRFORM values are read for this audit but are not emitted as FM formula parameters.",
     ]
     def_trn = {item.branch_id: item for item in summary.transport_parameters}
@@ -552,14 +668,15 @@ def _transport_formula_audit(
             if "MPMEXP" in trform_item.options:
                 option_index = trform_item.options.index("MPMEXP")
                 detail += f" MPMEXP parameters={' '.join(trform_item.options[option_index + 1:])}"
-            detail += "; formula calibration/options are not emitted"
+            detail += "; formula calibration/options are not emitted except for hiding/exposure via IHidExp"
         lines.append(f"- {detail}.")
 
     formula_types = {item.formula_type for item in summary.transport_parameters if item.formula_type is not None}
     if len(formula_types) <= 1 and formula_types == {1}:
         lines.append(
             "- FM limitation: the current SRE DEFTRN ty=1 agrees with the writer's fixed TraFrm=1, "
-            "but $TRFORM formula variants, calibration values, hiding/exposure options, and DEFTRN coefficients are not preserved."
+            "but $TRFORM formula variants, calibration values, and DEFTRN coefficients are not preserved; "
+            "hiding/exposure is represented by IHidExp."
         )
     elif len(formula_types) <= 1:
         lines.append(

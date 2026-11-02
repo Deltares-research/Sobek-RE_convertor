@@ -180,6 +180,13 @@ def test_convert_case_writes_detailed_conversion_log(tmp_path: Path) -> None:
     assert "include_input_read_details = False" in log_text
     assert "Morphodynamics interpretation and FM conversion" in log_text
     assert "FM morphology output: not written because activate_morphodynamics=False." in log_text
+    assert "Thresh = ThTrLyr = 0.8 m" in log_text
+    assert "SedThr = 0.1 m" in log_text
+    assert "not written to dflowfm/mor.mor (Thresh absent)" in log_text
+    assert "not written to dflowfm/mor.mor (SedThr absent)" in log_text
+    assert "value=PROPORTIONAL; FM uses built-in proportional updating" in log_text
+    assert "not written to dflowfm/mor.mor (BedUpd absent)" in log_text
+    assert "MPIN grain-size values are reported for diagnostics only; they are not used for FM sediment fractions or bed composition because GRAINP.TXT provides $FRACT and $GSINIT/LAYNUM." in log_text
     assert "DEFSUB DEFSUB.1 line 1 SBST md=1 -> not emitted because activate_morphodynamics=False." in log_text
     assert "SRE structure and RTC code interpretation" in log_text
     assert "SRE STDS ty=2 identifies a General Structure and is converted to D-Flow FM generalstructure." in log_text
@@ -334,17 +341,21 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     assert "DEFSUB DEFSUB.1 line 1 SBST md=1 -> enables the MDU [sediment] block and geometry BedlevType=1." in log_text
     assert "$GSOPT NONNGP flag: read at GRAINP.TXT line 15; no direct FM output" in log_text
     assert "$GSOPT NUNLAY: read at GRAINP.TXT line 13; value=20; number of SRE layers;" in log_text
-    assert "dflowfm/mor.mor MxNULyr (line 26, value=19)" in log_text
-    assert "dflowfm/mor.mor IUnderLyr (line 21, value=2)" in log_text
+    assert "dflowfm/mor.mor MxNULyr (line 28, value=19)" in log_text
+    assert "dflowfm/mor.mor IUnderLyr (line 23, value=2)" in log_text
     assert "$SEDPAR PACFAC: read at GRAINP.TXT line 25030; value=0.30; SRE bed porosity" in log_text
     assert "RhoSol (line 12, value=2.6500000e+03" in log_text
     assert "CDryB (line 14, value=1.8550000e+03" in log_text
     assert "SRE dune-height option; GILL selects the Gill dune-height calculation" in log_text
+    assert "$GSOPT LENOPT: read at GRAINP.TXT line 9; value=YALIN; selects the SRE dune-length predictor" in log_text
+    assert "$GSOPT ROUOPT: read at GRAINP.TXT line 10; value=WHITE; selects the SRE dune-roughness option" in log_text
+    assert "$GSPAR FDI: read at GRAINP.TXT line 25044; value=1; SRE coefficient for the transport-layer probability" in log_text
+    assert "$GSPAR REDFACMIL: read at GRAINP.TXT line 25046; value=4; SRE minimum effective layer thickness factor" in log_text
     assert "SRE $TRFORM MEY1 selects the special Meyer-Peter-Muller relation" in log_text
     assert "MPMEXP parameters=1 0.4 2" in log_text
     assert "Branch coverage: 7 $TRFORM definitions match 7 DEFTRN records" in log_text
     assert "the writer currently fixes TraFrm=1 instead of selecting it from SRE DEFTRN ty" in log_text
-    assert "$TRFORM formula variants, calibration values, hiding/exposure options, and DEFTRN coefficients are not preserved" in log_text
+    assert "$TRFORM formula variants, calibration values, and DEFTRN coefficients are not preserved; hiding/exposure is represented by IHidExp." in log_text
     assert any("SRE sediment transport formulas are not fully represented in FM" in warning for warning in report.warnings)
     assert "-> one FM [Sediment] block per fraction" in log_text
     assert "FM MxNULyr excludes the final well-mixed layer" in log_text
@@ -353,6 +364,16 @@ def test_convert_case_can_enable_morphodynamics_block(tmp_path: Path) -> None:
     assert log_text.index("write_cross_section_") < log_text.index("Morphodynamics interpretation")
     assert log_text.index("write_roughness") < log_text.index("Morphodynamics interpretation")
     mor_text = (dflowfm_dir / "mor.mor").read_text(encoding="utf-8")
+    assert "IHidExp         = 1" in mor_text
+    assert "Thresh           = 8.0000000e-01" in mor_text
+    assert "SedThr           = 1.0000000e-01" in mor_text
+    assert "Thresh = ThTrLyr = 0.8 m" in log_text
+    assert "SedThr = 0.1 m" in log_text
+    assert "used in dflowfm/mor.mor Thresh (line 9, value=8.0000000e-01)" in log_text
+    assert "used in dflowfm/mor.mor SedThr (line 10, value=1.0000000e-01)" in log_text
+    assert "$MORPAR METHOD: read at GRAINP.TXT line" in log_text
+    assert "value=PROPORTIONAL; FM uses built-in proportional updating" in log_text
+    assert "used in dflowfm/mor.mor BedUpd (line 11, value=1)" in log_text
     assert "IUnderLyr        = 2" in mor_text
     assert "MxNULyr          = 19" in mor_text
     assert "ThUnLyr          = 5.0000000e-01" in mor_text

@@ -1,7 +1,14 @@
 from pathlib import Path
+from configparser import ConfigParser
 
-from sre_convertor.io.fm.morphodynamics_writer import write_morphodynamics_files
+import pytest
+
+from sre_convertor.io.fm.morphodynamics_writer import (
+    format_morphodynamics_conversion_details,
+    write_morphodynamics_files,
+)
 from sre_convertor.models import (
+    ActiveLayerThicknessDefinition,
     Branch,
     BranchTransportParameters,
     CrossSectionLocation,
@@ -10,6 +17,118 @@ from sre_convertor.models import (
     NetworkModel,
     Node,
 )
+
+
+@pytest.mark.parametrize("thickness,nonuniform,expected", [(0.8, False, 0.8), (0.25, False, 0.25), (None, False, 1.0), (None, True, 1.0)])
+def test_morphology_thresholds_and_audit(
+    tmp_path: Path, thickness: float | None, nonuniform: bool, expected: float
+) -> None:
+    summary = MorphodynamicsSummary(
+        branch_count_with_grainsize=1,
+        has_morphology_switch=True,
+        active_layer_thickness_m=thickness,
+        active_layer_thicknesses=(
+            ActiveLayerThicknessDefinition("b1", 0.0, 100.0, 0.5),
+            ActiveLayerThicknessDefinition("b2", 0.0, 100.0, 0.8),
+        ) if nonuniform else (),
+        sediment_parameters=(("ALLUVIAL", "0.2"),),
+    )
+    mor_path, _, _, _ = write_morphodynamics_files(tmp_path, summary)
+    config = ConfigParser()
+    config.read(mor_path)
+    assert config.getfloat("Morphology", "Thresh") == expected
+    assert config.getfloat("Morphology", "Thresh") == config.getfloat("Underlayer", "ThTrLyr")
+    assert config.getfloat("Morphology", "SedThr") == 0.1
+
+    log = format_morphodynamics_conversion_details(summary, output_dir=tmp_path)
+    assert f"Thresh = ThTrLyr = {expected:g} m" in log
+    assert "not an exact mapping of SRE ALLUVIAL" in log
+    assert "SedThr = 0.1 m" in log
+    assert "no direct SRE sediment-specific depth threshold is mapped" in log
+    assert "used in dflowfm/mor.mor Thresh (line" in log
+    assert "used in dflowfm/mor.mor SedThr (line" in log
+
+
+@pytest.mark.parametrize("method", ["PROPORTIONAL", "proportional", "EQUAL", "UNKNOWN"])
+@pytest.mark.parametrize("morphology_written", [True, False])
+def test_cross_section_update_method_audit(
+    tmp_path: Path, method: str, morphology_written: bool
+) -> None:
+    summary = MorphodynamicsSummary(
+        branch_count_with_grainsize=1,
+        has_morphology_switch=True,
+        morphology_parameters=(("METHOD", method),),
+    )
+    if morphology_written:
+        mor_path, _, _, _ = write_morphodynamics_files(tmp_path, summary)
+        config = ConfigParser()
+        config.read(mor_path)
+        assert config.getint("Morphology", "BedUpd") == 1
+        assert not config.has_option("Morphology", "METHOD")
+
+    log = format_morphodynamics_conversion_details(
+        summary, output_dir=tmp_path,
+        activation_requested=morphology_written, morphology_written=morphology_written,
+    )
+    assert f"$MORPAR METHOD: read at GRAINP.TXT line not found; value={method};" in log
+    assert "built-in proportional updating for tabulated 1D (zwRiver) cross-sections" in log
+    if method.upper() == "PROPORTIONAL":
+        assert "bed-level changes scale with depth below the main-channel reference level" in log
+        assert "No separate METHOD keyword is written" in log
+        assert "not necessarily every SRE" in log
+    else:
+        assert f"METHOD={method} is not mapped" in log
+    if morphology_written:
+        assert "used in dflowfm/mor.mor BedUpd (line" in log
+    else:
+        assert "not written to dflowfm/mor.mor (BedUpd absent)" in log
+
+
+def test_morphodynamics_audit_explains_unmapped_sre_options(tmp_path: Path) -> None:
+    summary = MorphodynamicsSummary(
+        branch_count_with_grainsize=1,
+        has_morphology_switch=True,
+        sediment_parameters=(("KINVIS", "0.000001"), ("ALLUVIAL", "0.2")),
+        morphology_parameters=(
+            ("REDUC", "1"),
+            ("ITERMAX", "200"),
+            ("STABGI", "1.01"),
+            ("STABGT", "1.01"),
+            ("ALPHADG", "1"),
+            ("ALPHAEG", "1"),
+        ),
+        graded_sediment_options=(
+            ("HEIOPT", "GILL"),
+            ("LENOPT", "YALIN"),
+            ("ROUOPT", "WHITE"),
+            ("LATHIC", "INITIAL"),
+            ("LAYERS", "1"),
+            ("NUNLAY", "20"),
+        ),
+        graded_sediment_parameters=(
+            ("BETA1", "0.5"),
+            ("BETA2", "0.2"),
+            ("THEXFA", "0.25"),
+            ("FDI", "1"),
+            ("DUNLEN", "10"),
+            ("DZUNLA", "0.5"),
+            ("REDFACMIL", "4"),
+            ("ZBEPS", "0.05"),
+        ),
+        graded_sediment_flags=("ADNOML", "NNONGP", "SEDIM"),
+    )
+
+    log = format_morphodynamics_conversion_details(summary, output_dir=tmp_path)
+
+    assert "Each entry names the SRE field, its meaning" in log
+    assert "$MORPAR REDUC" in log
+    assert "dummy parameter that should be 1" in log
+    assert "$GSOPT LENOPT" in log
+    assert "dune-length predictor" in log
+    assert "$GSPAR REDFACMIL" in log
+    assert "REDFACMIL * Dm" in log
+    assert "$GSOPT ADNOML flag" in log
+    assert "adapts non-moving-layer composition" in log
 
 
 def test_write_morphodynamics_files_writes_mor_and_sed(tmp_path: Path) -> None:
